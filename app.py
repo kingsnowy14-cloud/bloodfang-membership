@@ -391,6 +391,9 @@ def my_memberships():
         return redirect(url_for("login"))
     with db_connect() as db:
         purchases = db.execute("SELECT id,tier_name,purchase_type,status,expires_at,provider,provider_ref,last_event FROM memberships WHERE user_id=? ORDER BY created_at DESC", (str(user["id"]),)).fetchall()
+    purchases = [dict(p) for p in purchases]
+    for purchase in purchases:
+        purchase["expires_label"] = time.strftime("%d %b %Y", time.gmtime(purchase["expires_at"])) if purchase["expires_at"] else None
     return render_template("memberships.html", purchases=purchases, now=int(time.time()), user=user)
 
 @app.post("/cancel-membership/<int:purchase_id>")
