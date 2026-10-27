@@ -2,7 +2,7 @@ import logging
 import os
 
 import discord
-from discord.ext import commands
+from discord.ext import commands, tasks
 
 logging.basicConfig(
     level=os.environ.get("LOG_LEVEL", "INFO"),
@@ -17,6 +17,12 @@ if not TOKEN:
 intents = discord.Intents.default()
 intents.message_content = True
 bot = commands.Bot(command_prefix="!", intents=intents, status=discord.Status.online, help_command=None)
+
+STATUS_ACTIVITIES = [
+    discord.Game(name="!membership"),
+    discord.Game(name="!pointshop"),
+]
+_status_index = 0
 
 MEMBERSHIPS = [
     ("FANGBORN", "€2.99", "10,000 Bloodpoints/day", "4 storage"),
@@ -91,12 +97,26 @@ async def pointshop(ctx):
     )
 
 
-@bot.event
-async def on_ready():
+@tasks.loop(minutes=2)
+async def rotate_status():
+    global _status_index
+    _status_index = (_status_index + 1) % len(STATUS_ACTIVITIES)
     await bot.change_presence(
         status=discord.Status.online,
-        activity=discord.Game(name="BLOODFANG Memberships"),
+        activity=STATUS_ACTIVITIES[_status_index],
     )
+    log.info("Rotated bot activity to %s", STATUS_ACTIVITIES[_status_index].name)
+
+
+@bot.event
+async def on_ready():
+    # Apply the first status immediately, then switch to the other every 2 minutes.
+    await bot.change_presence(
+        status=discord.Status.online,
+        activity=STATUS_ACTIVITIES[_status_index],
+    )
+    if not rotate_status.is_running():
+        rotate_status.start()
     log.info("BLOODFANG bot is online as %s (ID: %s)", bot.user, bot.user.id)
 
 
