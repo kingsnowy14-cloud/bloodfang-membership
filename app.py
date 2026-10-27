@@ -113,8 +113,7 @@ def checkout(tier_name):
         session["checkout_csrf"] = secrets.token_urlsafe(24)
         return render_template("message.html", title="Membership checkout", tier=tier, user=user,
                                test_mode=ENABLE_TEST_PURCHASES, csrf_token=session["checkout_csrf"],
-                               payment_mode=True, stripe_enabled=bool(STRIPE_SECRET_KEY),
-                               paypal_enabled=bool(PAYPAL_CLIENT_ID and PAYPAL_CLIENT_SECRET))
+                               payment_mode=True, paypal_enabled=bool(PAYPAL_CLIENT_ID and PAYPAL_CLIENT_SECRET))
     submitted_token = request.form.get("csrf_token", "")
     saved_token = session.pop("checkout_csrf", "")
     if not submitted_token or not saved_token or not secrets.compare_digest(submitted_token, saved_token):
@@ -123,8 +122,8 @@ def checkout(tier_name):
     provider = request.form.get("provider", "").lower()
     if purchase_type not in ("one_time", "subscription"):
         return render_template("message.html", title="Invalid purchase type", message="Choose a one-time purchase or monthly subscription."), 400
-    if provider not in ("stripe", "paypal"):
-        return render_template("message.html", title="Choose a payment provider", message="Choose Stripe or PayPal."), 400
+    if provider != "paypal":
+        return render_template("message.html", title="Invalid payment provider", message="Only PayPal payments are supported."), 400
     if not PUBLIC_BASE_URL:
         return render_template("message.html", title="Website URL missing", message="Set PUBLIC_BASE_URL in Railway to your public https:// website URL."), 503
     if not DISCORD_BOT_TOKEN or not DISCORD_GUILD_ID:
@@ -142,10 +141,7 @@ def checkout(tier_name):
                                message=f"TEST ONLY: {tier['name']} role assigned. No payment was taken.")
     try:
         import asyncio
-        if provider == "stripe":
-            checkout_url = asyncio.run(create_stripe_checkout(user, tier, purchase_type))
-        else:
-            checkout_url = asyncio.run(create_paypal_checkout(user, tier, purchase_type))
+        checkout_url = asyncio.run(create_paypal_checkout(user, tier, purchase_type))
     except Exception as exc:
         app.logger.exception("Could not create %s checkout", provider)
         return render_template("message.html", title="Checkout could not be started", message=str(exc)), 502
@@ -199,8 +195,6 @@ import json
 from apscheduler.schedulers.background import BackgroundScheduler
 
 DB_PATH = os.environ.get("MEMBERSHIP_DB_PATH", "/data/membership.sqlite3")
-STRIPE_SECRET_KEY = os.environ.get("STRIPE_SECRET_KEY", "")
-STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
 PAYPAL_CLIENT_ID = os.environ.get("PAYPAL_CLIENT_ID", "")
 PAYPAL_CLIENT_SECRET = os.environ.get("PAYPAL_CLIENT_SECRET", "")
 PAYPAL_WEBHOOK_ID = os.environ.get("PAYPAL_WEBHOOK_ID", "")
@@ -233,36 +227,6 @@ def save_purchase(user_id, tier_name, provider_ref, purchase_type, expires_at, p
                       VALUES(?,?,?,?,?,'active',?,?) ON CONFLICT(provider_ref) DO UPDATE SET
                       status='active', expires_at=excluded.expires_at, last_event=NULL""",
                    (str(user_id), tier_name, provider, str(provider_ref), purchase_type, expires_at, now))
-
-
-async def create_stripe_checkout(user, tier, purchase_type):
-    if not STRIPE_SECRET_KEY:
-        raise RuntimeError("Stripe is not configured: set STRIPE_SECRET_KEY in Railway.")
-    cents = int(round(float(tier["price"].replace(",", ".")) * 100))
-    form = {
-        "mode": "subscription" if purchase_type == "subscription" else "payment",
-        "success_url": PUBLIC_BASE_URL + "/payment/success?session_id={CHECKOUT_SESSION_ID}",
-        "cancel_url": PUBLIC_BASE_URL + "/checkout/" + tier["name"].lower().replace(" ", "-"),
-        "client_reference_id": str(user["id"]),
-        "metadata[discord_user_id]": str(user["id"]),
-        "metadata[tier_name]": tier["name"],
-        "metadata[purchase_type]": purchase_type,
-        "line_items[0][quantity]": "1",
-        "line_items[0][price_data][currency]": "eur",
-        "line_items[0][price_data][unit_amount]": str(cents),
-        "line_items[0][price_data][product_data][name]": "BLOODFANG " + tier["name"] + " membership",
-    }
-    if purchase_type == "subscription":
-        form["line_items[0][price_data][recurring][interval]"] = "month"
-        form["subscription_data[metadata][discord_user_id]"] = str(user["id"])
-        form["subscription_data[metadata][tier_name]"] = tier["name"]
-    async with aiohttp.ClientSession() as client:
-        async with client.post("https://api.stripe.com/v1/checkout/sessions", data=form,
-                               auth=aiohttp.BasicAuth(STRIPE_SECRET_KEY, "")) as response:
-            data = await response.json()
-            if response.status >= 300:
-                raise RuntimeError(data.get("error", {}).get("message", "Stripe checkout creation failed."))
-            return data["url"]
 
 
 async def paypal_access_token(client):
@@ -366,83 +330,6 @@ async def verify_paypal_webhook(headers, event):
             return response.status == 200 and data.get("verification_status") == "SUCCESS"
 
 
-@app.post("/webhooks/stripe")
-def stripe_webhook():
-    if not STRIPE_WEBHOOK_SECRET:
-        return {"error": "webhook not configured"}, 503
-    raw = request.get_data()
-    signature = request.headers.get("Stripe-Signature", "")
-    try:
-        parts = dict(item.split("=", 1) for item in signature.split(",") if "=" in item)
-        timestamp = parts.get("t", "")
-        expected = hmac.new(STRIPE_WEBHOOK_SECRET.encode(), timestamp.encode() + b"." + raw, hashlib.sha256).hexdigest()
-        if not timestamp or abs(int(time.time()) - int(timestamp)) > 300 or not any(hmac.compare_digest(expected, sig) for sig in parts.get("v1", "").split()):
-            return {"error": "invalid signature"}, 400
-        event = json.loads(raw)
-    except Exception:
-        return {"error": "invalid payload"}, 400
-    import asyncio
-    kind = event.get("type")
-    obj = event.get("data", {}).get("object", {})
-    metadata = obj.get("metadata", {})
-    user_id = metadata.get("discord_user_id")
-    tier_name = metadata.get("tier_name")
-    purchase_type = metadata.get("purchase_type")
-    ref = str(obj.get("id", ""))
-    if kind == "checkout.session.completed":
-        user_id = user_id or obj.get("client_reference_id")
-        if obj.get("mode") == "payment" and obj.get("payment_status") == "paid" and user_id and tier_name:
-            try:
-                asyncio.run(assign_membership_role(user_id, tier_name))
-                save_purchase(user_id, tier_name, ref, "one_time", None, "stripe")
-            except Exception:
-                app.logger.exception("Stripe one-time role activation failed")
-                return {"error": "activation failed; retry webhook"}, 500
-        elif obj.get("mode") == "subscription" and user_id and tier_name:
-            subscription_ref = str(obj.get("subscription") or ref)
-            with db_connect() as db:
-                db.execute("""INSERT INTO memberships(user_id,tier_name,provider,provider_ref,purchase_type,status,expires_at,created_at)
-                    VALUES(?,?,?,?, 'subscription','pending',NULL,?) ON CONFLICT(provider_ref) DO NOTHING""",
-                    (str(user_id), tier_name, "stripe", subscription_ref, int(time.time())))
-    elif kind == "invoice.paid":
-        # Stripe subscription metadata may be attached to the subscription, so retrieve it.
-        subscription_ref = str(obj.get("subscription") or "")
-        try:
-            asyncio.run(activate_stripe_subscription(subscription_ref, ref))
-        except Exception:
-            app.logger.exception("Stripe recurring payment activation failed")
-            return {"error": "activation failed; retry webhook"}, 500
-    elif kind in ("customer.subscription.deleted", "customer.subscription.paused"):
-        sub_ref = str(obj.get("id", ""))
-        with db_connect() as db:
-            db.execute("UPDATE memberships SET status='cancelled', expires_at=? WHERE provider_ref=? AND purchase_type='subscription'",
-                       (int(time.time()), sub_ref))
-    return {"received": True}
-
-
-async def activate_stripe_subscription(subscription_ref, invoice_ref):
-    if not STRIPE_SECRET_KEY or not subscription_ref:
-        return
-    async with aiohttp.ClientSession() as client:
-        async with client.get(f"https://api.stripe.com/v1/subscriptions/{subscription_ref}",
-                              auth=aiohttp.BasicAuth(STRIPE_SECRET_KEY, "")) as response:
-            data = await response.json()
-            if response.status >= 300:
-                raise RuntimeError("Could not retrieve Stripe subscription metadata.")
-    meta = data.get("metadata", {})
-    user_id, tier_name = meta.get("discord_user_id"), meta.get("tier_name")
-    if not user_id or not tier_name:
-        return
-    expires_at = int(data.get("current_period_end") or (time.time() + 30 * 86400))
-    import asyncio
-    await assign_membership_role(user_id, tier_name)
-    with db_connect() as db:
-        db.execute("""INSERT INTO memberships(user_id,tier_name,provider,provider_ref,purchase_type,status,expires_at,created_at,last_event)
-                      VALUES(?,?, 'stripe', ?, 'subscription','active',?,?,?)
-                      ON CONFLICT(provider_ref) DO UPDATE SET status='active', expires_at=excluded.expires_at, last_event=excluded.last_event""",
-                   (str(user_id), tier_name, subscription_ref, expires_at, int(time.time()), invoice_ref))
-
-
 @app.post("/webhooks/paypal")
 def paypal_webhook():
     event = request.get_json(silent=True) or {}
@@ -543,7 +430,6 @@ def withdrawal():
 def health():
     return {
         "status": "ok",
-        "stripe_configured": bool(STRIPE_SECRET_KEY and STRIPE_WEBHOOK_SECRET),
         "paypal_configured": bool(PAYPAL_CLIENT_ID and PAYPAL_CLIENT_SECRET and PAYPAL_WEBHOOK_ID),
         "discord_roles_configured": bool(DISCORD_BOT_TOKEN and DISCORD_GUILD_ID),
         "database_path": DB_PATH,
