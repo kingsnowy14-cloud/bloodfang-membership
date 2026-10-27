@@ -110,10 +110,14 @@ def checkout(tier_name):
     if not tier:
         return render_template("message.html", title="Rank not found", message="This membership rank does not exist."), 404
     if request.method == "GET":
+        # Until PayPal API credentials are configured, send the visitor directly to PayPal.
+        # This opens PayPal's website only; it cannot create or confirm a BLOODFANG payment.
+        if not (PAYPAL_CLIENT_ID and PAYPAL_CLIENT_SECRET):
+            return redirect("https://www.paypal.com/")
         session["checkout_csrf"] = secrets.token_urlsafe(24)
         return render_template("message.html", title="Membership checkout", tier=tier, user=user,
                                test_mode=ENABLE_TEST_PURCHASES, csrf_token=session["checkout_csrf"],
-                               payment_mode=True, purchase_type=request.args.get("purchase_type", "subscription"), paypal_enabled=bool(PAYPAL_CLIENT_ID and PAYPAL_CLIENT_SECRET))
+                               payment_mode=True, purchase_type=request.args.get("purchase_type", "subscription"), paypal_enabled=True)
     submitted_token = request.form.get("csrf_token", "")
     saved_token = session.pop("checkout_csrf", "")
     if not submitted_token or not saved_token or not secrets.compare_digest(submitted_token, saved_token):
