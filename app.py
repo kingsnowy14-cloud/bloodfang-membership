@@ -488,7 +488,7 @@ def send_expiry_reminders():
                              AND reminder_sent_at IS NULL AND email IS NOT NULL AND email!=''
                              AND expires_at IS NOT NULL
                              AND expires_at<=? AND expires_at>?""",
-                          (now + 5 * 86400 + 15 * 60, now + 5 * 86400 - 30 * 60)).fetchall()
+                          (now + 5 * 86400, now)).fetchall()
     import asyncio
     for row in rows:
         try:
@@ -551,17 +551,6 @@ def health():
         "discord_roles_configured": bool(DISCORD_BOT_TOKEN and DISCORD_GUILD_ID),
         "database_path": DB_PATH,
     }
-
-# Start periodic maintenance jobs for expiry emails and role removal.
-# Use a Railway persistent volume mounted at /data to preserve reminder state.
-scheduler = BackgroundScheduler(timezone="UTC")
-scheduler.add_job(send_expiry_reminders, "interval", minutes=5,
-                  id="membership_expiry_reminders", replace_existing=True,
-                  max_instances=1, coalesce=True)
-scheduler.add_job(expire_memberships, "interval", minutes=5,
-                  id="membership_expiration", replace_existing=True,
-                  max_instances=1, coalesce=True)
-scheduler.start()
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", "8080"))
