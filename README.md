@@ -85,3 +85,24 @@ Before accepting any payment:
 - Obtain a qualified legal/tax review for the operator's actual circumstances and the countries targeted. International targeting can trigger additional consumer and tax requirements.
 
 Until this checklist is reviewed and all placeholders are completed, keep payment processing disabled. The website currently does not take payments.
+
+
+## Discord offer DM commands
+
+The repository also includes `bot.py`, which responds to these commands in a server and sends the offer lists to the command user's DMs:
+
+- `!membership` — all eight membership ranks, monthly prices, one-time prices, and listed benefits.
+- `!pointshop` — all points packages and prices.
+
+### Run the Discord bot on Railway
+
+Run the bot as a **separate Railway service** from the website service, using this same repository:
+
+1. Add a new service from this GitHub repository.
+2. Set its start command to `python bot.py`.
+3. Add `DISCORD_BOT_TOKEN` to that bot service's Variables. Do not paste the token into source code.
+4. In Discord Developer Portal → your application → **Bot** → **Privileged Gateway Intents**, enable **Message Content Intent** and save.
+5. Ensure the bot is invited to your server with permission to read messages, send messages, embed links, and send direct messages.
+6. Deploy the bot service and test `!membership` and `!pointshop` in a server text channel.
+
+Users must allow DMs from server members for the bot to send their offers. The commands display the prices and benefits configured in `bot.py`; update those values if the website's prices or benefits change.
