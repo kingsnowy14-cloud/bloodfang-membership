@@ -24,9 +24,18 @@ TIERS = [
     {"name":"BLOOD GOD","emoji":"👹","price":"100,00","points":"1.600.000","storage":"20"},
 ]
 
+POINT_PACKAGES = [
+    {"points":"2.500.000","price":"10,00","featured":False},
+    {"points":"6.500.000","price":"25,00","featured":False},
+    {"points":"16.500.000","price":"55,00","featured":True},
+    {"points":"45.000.000","price":"115,00","featured":False},
+    {"points":"150.000.000","price":"230,00","featured":False},
+    {"points":"300.000.000","price":"350,00","featured":False},
+]
+
 @app.get("/")
 def index():
-    return render_template("index.html", tiers=TIERS, user=session.get("discord_user"))
+    return render_template("index.html", tiers=TIERS, points=POINT_PACKAGES, user=session.get("discord_user"))
 
 @app.get("/login")
 def login():
