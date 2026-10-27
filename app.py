@@ -20,9 +20,7 @@ DISCORD_GUILD_ID = os.environ.get("DISCORD_GUILD_ID", "1561027077984227371")
 ENABLE_TEST_PURCHASES = os.environ.get("ENABLE_TEST_PURCHASES", "false").lower() == "true"
 
 TIERS = [
-    {"name":"FANGBORN","emoji":"🩸","price":"2,99","points":"10.000","storage":"4"},
     {"name":"STALKER","emoji":"🦴","price":"4,99","points":"25.000","storage":"5"},
-    {"name":"RAVAGER","emoji":"🐺","price":"7,99","points":"50.000","storage":"6"},
     {"name":"WARLORD","emoji":"👑","price":"12,99","points":"100.000","storage":"8"},
     {"name":"APEX","emoji":"☠️","price":"19,99","points":"200.000","storage":"9"},
     {"name":"BLOOD EMPEROR","emoji":"🔥","price":"29,99","points":"350.000","storage":"10"},
