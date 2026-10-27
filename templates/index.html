@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="de">
+<html lang="en">
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#0c0b0d">
@@ -8,25 +8,25 @@
 </head>
 <body>
 <header class="topbar"><a class="brand" href="/">BLOOD<span>FANG</span></a><nav>
-{% if user %}<span class="user">Angemeldet als {{ user.global_name }}</span><a class="navbtn" href="/logout">Abmelden</a>
-{% else %}<a class="navbtn" href="/login">Mit Discord anmelden</a>{% endif %}
+{% if user %}<span class="user">Signed in as {{ user.global_name }}</span><a class="navbtn" href="/logout">Sign out</a>
+{% else %}<a class="navbtn" href="/login">Sign in with Discord</a>{% endif %}
 </nav></header>
 <main>
 <section class="hero"><div class="eyebrow">THE ISLE: EVRIMA · MEMBERSHIP</div><h1>HUNT. SURVIVE.<br><span>DOMINATE.</span></h1>
-<p>Werde Teil von BLOODFANG. Wähle deinen Rang und schalte die dazugehörigen Community-Vorteile frei.</p><p class="monthly-note">Alle Mitgliedschaften sind als <strong>monatliche Abos</strong> gedacht. Der angezeigte Preis gilt pro Monat.</p>
-<a class="primary" href="#ranks">Ränge entdecken <span>↓</span></a>
+<p>Join BLOODFANG. Choose your rank and unlock the community benefits that come with it.</p><p class="monthly-note">All memberships are <strong>monthly subscriptions</strong>. The displayed price is per month.</p>
+<a class="primary" href="#ranks">Explore ranks <span>↓</span></a>
 <div class="hero-mark">BF</div></section>
-<section class="section" id="ranks"><div class="section-head"><div><div class="eyebrow">WÄHLE DEINEN PFAD</div><h2>Die Ränge</h2></div><p>Jeder Rang enthält die Vorteile der niedrigeren Stufen. <strong>Abrechnung monatlich.</strong></p></div>
+<section class="section" id="ranks"><div class="section-head"><div><div class="eyebrow">CHOOSE YOUR PATH</div><h2>Membership Ranks</h2></div><p>Every rank includes the benefits of lower tiers. <strong>Billed monthly.</strong></p></div>
 <div class="tiers">{% for tier in tiers %}<article class="tier {% if tier.name in ['APEX','BLOOD EMPEROR','BLOOD TITAN','BLOOD GOD'] %}elite{% endif %}">
 <div class="tier-top"><span class="emoji">{{ tier.emoji }}</span><span class="tier-index">{{ "%02d"|format(loop.index) }}</span></div>
-<h3>{{ tier.name }}</h3><div class="price">€{{ tier.price }}<small> / Monat</small></div>
-<div class="benefits"><div><span>Bloodpoints / Tag</span><strong>{{ tier.points }}</strong></div><div><span>Storage-Slots</span><strong>{{ tier.storage }}</strong></div><div><span>Discord-Rolle</span><strong>Inklusive</strong></div>
-{% if tier.name in ['APEX','BLOOD EMPEROR','BLOOD TITAN','BLOOD GOD'] %}<div><span>Rang-Icon</span><strong>Geplant</strong></div>{% endif %}
-{% if tier.name in ['BLOOD TITAN','BLOOD GOD'] %}<div><span>Priority Support</span><strong>Inklusive</strong></div>{% endif %}</div>
-{% if user %}<a class="tier-button" href="/checkout/{{ tier.name|lower|replace(' ', '-') }}">Monatlich kaufen <span>↗</span></a>{% else %}<a class="tier-button" href="/login">Mit Discord anmelden, um zu kaufen <span>↗</span></a>{% endif %}
+<h3>{{ tier.name }}</h3><div class="price">€{{ tier.price }}<small> / month</small></div>
+<div class="benefits"><div><span>Bloodpoints / day</span><strong>{{ tier.points }}</strong></div><div><span>Storage slots</span><strong>{{ tier.storage }}</strong></div><div><span>Discord role</span><strong>Included</strong></div>
+{% if tier.name in ['APEX','BLOOD EMPEROR','BLOOD TITAN','BLOOD GOD'] %}<div><span>Rang-Icon</span><strong>Planned</strong></div>{% endif %}
+{% if tier.name in ['BLOOD TITAN','BLOOD GOD'] %}<div><span>Priority Support</span><strong>Included</strong></div>{% endif %}</div>
+{% if user %}<a class="tier-button" href="/checkout/{{ tier.name|lower|replace(' ', '-') }}">Subscribe monthly <span>↗</span></a>{% else %}<a class="tier-button" href="/login">Sign in with Discord, um zu kaufen <span>↗</span></a>{% endif %}
 </article>{% endfor %}</div>
-<p class="disclaimer"><strong>Monatliche Mitgliedschaft:</strong> Alle angezeigten Preise gelten pro Monat. Die Zahlung ist derzeit noch nicht aktiviert; es wird aktuell nichts abgebucht.</p><p class="disclaimer">Hinweis: Bloodpoints, Storage-Slots und weitere spielbezogene Vorteile werden erst aktiviert, wenn sie technisch auf dem Evrima-Server unterstützt und eingerichtet sind. Mitgliedschafts-Zahlungen sind derzeit noch nicht aktiviert.</p>
+<p class="disclaimer"><strong>Monthly membership:</strong> All displayed prices are per month. Payments are not enabled yet, and no money will be charged.</p><p class="disclaimer">Hinweis: Bloodpoints, Storage slots und weitere spielbezogene Vorteile werden erst aktiviert, wenn sie technisch auf dem Evrima-Server unterstützt und eingerichtet sind. Mitgliedschafts-Zahlungen sind derzeit noch nicht aktiviert.</p>
 </section>
-<section class="cta"><div class="eyebrow">DEIN RANG. DEIN RUDel.</div><h2>Bereit für die Jagd?</h2><p>Melde dich mit Discord an, um deinen Membership-Status später verwalten zu können.</p><a class="primary" href="/login">Discord verbinden <span>↗</span></a></section>
-</main><footer><a class="brand" href="/">BLOOD<span>FANG</span></a><span>Fan community · The Isle: Evrima</span><span>Membership portal · Monatliche Abos</span></footer>
+<section class="cta"><div class="eyebrow">YOUR RANK. YOUR RULES.</div><h2>Ready to hunt?</h2><p>Sign in with Discord to manage your membership status when that feature becomes available.</p><a class="primary" href="/login">Connect Discord <span>↗</span></a></section>
+</main><footer><a class="brand" href="/">BLOOD<span>FANG</span></a><span>Fan community · The Isle: Evrima</span><span>Membership portal · Monthly subscriptions</span></footer>
 </body></html>
