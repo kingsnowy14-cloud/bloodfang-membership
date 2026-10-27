@@ -122,9 +122,6 @@ def checkout(tier_name):
     saved_token = session.pop("checkout_csrf", "")
     if not submitted_token or not saved_token or not secrets.compare_digest(submitted_token, saved_token):
         return render_template("message.html", title="Checkout expired", message="Please return and try again."), 400
-    email = request.form.get("email", "").strip()
-    if "@" not in email or "." not in email.rsplit("@", 1)[-1]:
-        return render_template("message.html", title="Valid email required", message="Please enter a valid email address so we can send your membership expiry reminder."), 400
     purchase_type = request.form.get("purchase_type", "subscription")
     provider = request.form.get("provider", "").lower()
     if purchase_type not in ("one_time", "subscription"):
@@ -140,7 +137,7 @@ def checkout(tier_name):
         try:
             asyncio.run(assign_membership_role(user["id"], tier["name"]))
             save_purchase(user["id"], tier["name"], "test-" + secrets.token_hex(8), purchase_type,
-                          int(time.time()) + 30 * 86400 if purchase_type in ("subscription", "one_time") else None, "test", email)
+                          int(time.time()) + 30 * 86400 if purchase_type in ("subscription", "one_time") else None, "test")
         except Exception as exc:
             app.logger.exception("Test role assignment failed")
             return render_template("message.html", title="Could not activate test membership", message=str(exc)), 502
@@ -148,7 +145,7 @@ def checkout(tier_name):
                                message=f"TEST ONLY: {tier['name']} role assigned. No payment was taken.")
     try:
         import asyncio
-        checkout_url = asyncio.run(create_paypal_checkout(user, tier, purchase_type, email))
+        checkout_url = asyncio.run(create_paypal_checkout(user, tier, purchase_type))
     except Exception as exc:
         app.logger.exception("Could not create %s checkout", provider)
         return render_template("message.html", title="Checkout could not be started", message=str(exc)), 502
@@ -207,11 +204,6 @@ PAYPAL_CLIENT_SECRET = os.environ.get("PAYPAL_CLIENT_SECRET", "")
 PAYPAL_WEBHOOK_ID = os.environ.get("PAYPAL_WEBHOOK_ID", "")
 PAYPAL_MODE = os.environ.get("PAYPAL_MODE", "sandbox").lower()
 PAYPAL_API = "https://api-m.paypal.com" if PAYPAL_MODE == "live" else "https://api-m.sandbox.paypal.com"
-SMTP_HOST = os.environ.get("SMTP_HOST", "smtp-relay.brevo.com")
-SMTP_PORT = int(os.environ.get("SMTP_PORT", "587"))
-SMTP_USER = os.environ.get("SMTP_USER", "")
-SMTP_PASSWORD = os.environ.get("SMTP_PASSWORD", "")
-MAIL_FROM = os.environ.get("MAIL_FROM", SMTP_USER)
 
 
 def db_connect():
@@ -237,13 +229,13 @@ def init_db():
         db.execute("CREATE INDEX IF NOT EXISTS idx_memberships_expiry ON memberships(status, purchase_type, expires_at)")
 
 
-def save_purchase(user_id, tier_name, provider_ref, purchase_type, expires_at, provider, email=None):
+def save_purchase(user_id, tier_name, provider_ref, purchase_type, expires_at, provider):
     now = int(time.time())
     with db_connect() as db:
-        db.execute("""INSERT INTO memberships(user_id,tier_name,provider,provider_ref,purchase_type,status,expires_at,created_at,email)
-                      VALUES(?,?,?,?,?,'active',?,?,?) ON CONFLICT(provider_ref) DO UPDATE SET
-                      status='active', expires_at=excluded.expires_at, email=COALESCE(excluded.email,email), last_event=NULL""",
-                   (str(user_id), tier_name, provider, str(provider_ref), purchase_type, expires_at, now, email))
+        db.execute("""INSERT INTO memberships(user_id,tier_name,provider,provider_ref,purchase_type,status,expires_at,created_at)
+                      VALUES(?,?,?,?,?,'active',?,?) ON CONFLICT(provider_ref) DO UPDATE SET
+                      status='active', expires_at=excluded.expires_at, last_event=NULL""",
+                   (str(user_id), tier_name, provider, str(provider_ref), purchase_type, expires_at, now))
 
 
 async def paypal_access_token(client):
@@ -257,11 +249,11 @@ async def paypal_access_token(client):
         return data["access_token"]
 
 
-async def create_paypal_checkout(user, tier, purchase_type, email):
+async def create_paypal_checkout(user, tier, purchase_type):
     async with aiohttp.ClientSession() as client:
         token = await paypal_access_token(client)
         headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
-        custom_id = json.dumps({"user_id": str(user["id"]), "tier": tier["name"], "type": purchase_type, "email": email})
+        custom_id = json.dumps({"user_id": str(user["id"]), "tier": tier["name"], "type": purchase_type})
         if purchase_type == "one_time":
             payload = {"intent": "CAPTURE", "purchase_units": [{
                 "custom_id": custom_id, "description": "BLOODFANG " + tier["name"],
@@ -306,7 +298,7 @@ def paypal_return():
             if result:
                 user_id, tier_name, ref = result
                 asyncio.run(assign_membership_role(user_id, tier_name))
-                save_purchase(user_id, tier_name, ref, "one_time", int(time.time()) + 30 * 86400, "paypal", result[3])
+                save_purchase(user_id, tier_name, ref, "one_time", int(time.time()) + 30 * 86400, "paypal")
                 return render_template("message.html", title="Purchase complete",
                                        message=f"Your {tier_name} role has been activated. This was a one-time purchase.")
         return render_template("message.html", title="Subscription pending",
@@ -329,7 +321,7 @@ async def capture_paypal_order(order_id):
         custom = json.loads(unit.get("payments", {}).get("captures", [{}])[0].get("custom_id") or unit.get("custom_id") or "{}")
         if data.get("status") != "COMPLETED" or not custom.get("user_id") or not custom.get("tier"):
             return None
-        return str(custom["user_id"]), custom["tier"], "paypal-order-" + order_id, custom.get("email", "")
+        return str(custom["user_id"]), custom["tier"], "paypal-order-" + order_id
 
 
 async def verify_paypal_webhook(headers, event):
@@ -441,34 +433,50 @@ def cancel_membership(purchase_id):
         app.logger.exception("PayPal subscription cancellation failed")
         return render_template("message.html", title="Cancellation failed", message="We could not cancel this subscription with PayPal. Please cancel it directly in your PayPal account and try again."), 502
 
+async def send_discord_dm(user_id, message):
+    if not DISCORD_BOT_TOKEN:
+        raise RuntimeError("DISCORD_BOT_TOKEN is not configured.")
+    headers = {"Authorization": f"Bot {DISCORD_BOT_TOKEN}", "Content-Type": "application/json"}
+    async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=15)) as client:
+        async with client.post("https://discord.com/api/v10/users/@me/channels",
+                               headers=headers, json={"recipient_id": str(user_id)}) as response:
+            data = await response.json()
+            if response.status not in (200, 201):
+                raise RuntimeError(f"Discord could not open a DM (HTTP {response.status}). The member may have DMs disabled.")
+            channel_id = data["id"]
+        async with client.post(f"https://discord.com/api/v10/channels/{channel_id}/messages",
+                               headers=headers, json={"content": message}) as response:
+            if response.status not in (200, 201):
+                raise RuntimeError(f"Discord could not send the expiry DM (HTTP {response.status}).")
+
+
 def send_expiry_reminders():
-    # Send one English email five days before a 30-day one-time purchase expires.
-    if not (SMTP_USER and SMTP_PASSWORD and MAIL_FROM):
+    # Send one English Discord DM five days before a 30-day one-time purchase expires.
+    if not DISCORD_BOT_TOKEN:
         return
     now = int(time.time())
     with db_connect() as db:
-        rows = db.execute("""SELECT id,tier_name,email FROM memberships
+        rows = db.execute("""SELECT id,user_id,tier_name FROM memberships
                              WHERE purchase_type='one_time' AND status='active'
-                             AND email IS NOT NULL AND email!='' AND reminder_sent_at IS NULL
+                             AND reminder_sent_at IS NULL
                              AND expires_at IS NOT NULL AND expires_at<=? AND expires_at>?""",
                           (now + 5 * 86400, now)).fetchall()
-    import smtplib
-    from email.message import EmailMessage
+    import asyncio
     for row in rows:
-        msg = EmailMessage()
-        msg["Subject"] = "Your BLOODFANG membership expires in 5 days"
-        msg["From"] = MAIL_FROM
-        msg["To"] = row["email"]
-        msg.set_content("Hello BLOODFANG member,\n\nYour one-time BLOODFANG " + row["tier_name"] + " membership expires in 5 days.\n\nIf you enjoyed your membership, you are welcome to purchase it again here:\n" + PUBLIC_BASE_URL + "/#ranks\n\nThank you for being part of BLOODFANG!\n\nBLOODFANG Team")
+        message = (
+            "🩸 **BLOODFANG Membership Reminder**\n\n"
+            f"Your one-time **{row['tier_name']}** membership expires in **5 days**.\n\n"
+            "If you enjoyed your membership, you are welcome to purchase it again here:\n"
+            f"{PUBLIC_BASE_URL}/#ranks\n\n"
+            "Thank you for being part of BLOODFANG!\n"
+            "**BLOODFANG Team**"
+        )
         try:
-            with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=20) as smtp:
-                smtp.starttls()
-                smtp.login(SMTP_USER, SMTP_PASSWORD)
-                smtp.send_message(msg)
+            asyncio.run(send_discord_dm(row["user_id"], message))
             with db_connect() as db:
                 db.execute("UPDATE memberships SET reminder_sent_at=? WHERE id=? AND reminder_sent_at IS NULL", (now, row["id"]))
         except Exception:
-            app.logger.exception("Could not send expiry reminder for membership id=%s", row["id"])
+            app.logger.exception("Could not send expiry Discord DM for membership id=%s", row["id"])
 
 def expire_memberships():
     now = int(time.time())
