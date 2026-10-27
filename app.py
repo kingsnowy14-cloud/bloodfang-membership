@@ -1,8 +1,8 @@
 import os
 import secrets
 import asyncio
-import discord
 from urllib.parse import urlencode
+import urllib.request
 
 import aiohttp
 from flask import Flask, redirect, render_template, request, session, url_for
@@ -580,87 +580,43 @@ def health():
     }
 
 
-# Discord slash command + purchase logging. /shoplog sets the channel where
-# confirmed purchases and subscription renewals are posted.
-shop_bot = None
+# Purchase logs are sent through a Discord webhook created by /shoplog in bot.py.
+SHOPLOG_WEBHOOK_URL = os.environ.get("SHOPLOG_WEBHOOK_URL", "").strip()
 
 def send_shop_log(title, user_id, tier_name, purchase_type, provider, provider_ref, expires_at, status):
-    bot = shop_bot
-    if bot is None or not bot.is_ready():
-        app.logger.warning("Shop log skipped because the Discord bot is not ready.")
+    if not SHOPLOG_WEBHOOK_URL:
+        app.logger.info("Shop logging is not configured. Run /shoplog and set SHOPLOG_WEBHOOK_URL on the website service.")
         return
-    with db_connect() as db:
-        row = db.execute("SELECT value FROM app_settings WHERE key='shoplog_channel_id'").fetchone()
-    if not row:
-        app.logger.info("Shop log channel is not configured. Run /shoplog in the desired channel.")
-        return
-    channel_id = int(row["value"])
     expiry_text = f"<t:{int(expires_at)}:F>" if expires_at else "Not set"
-    embed = discord.Embed(title=f"🛒 {title}", color=discord.Color.from_rgb(153, 0, 0), timestamp=discord.utils.utcnow())
-    embed.add_field(name="Member", value=f"<@{user_id}> (ID: {user_id})", inline=False)
-    embed.add_field(name="Membership", value=tier_name, inline=True)
-    embed.add_field(name="Purchase type", value=purchase_type.replace("_", " ").title(), inline=True)
-    embed.add_field(name="Payment provider", value=provider.upper(), inline=True)
-    embed.add_field(name="Status", value=status, inline=True)
-    embed.add_field(name="Access expires", value=expiry_text, inline=False)
-    embed.add_field(name="Reference", value=provider_ref[:1000], inline=False)
-    coro = _send_shop_log_message(channel_id, embed)
-    asyncio.run_coroutine_threadsafe(coro, bot.loop)
-
-async def _send_shop_log_message(channel_id, embed):
+    payload = {
+        "embeds": [{
+            "title": f"🛒 {title}",
+            "color": 10027008,
+            "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            "fields": [
+                {"name": "Member", "value": f"<@{user_id}> (ID: {user_id})", "inline": False},
+                {"name": "Membership", "value": str(tier_name)[:1024], "inline": True},
+                {"name": "Purchase type", "value": str(purchase_type).replace("_", " ").title()[:1024], "inline": True},
+                {"name": "Payment provider", "value": str(provider).upper()[:1024], "inline": True},
+                {"name": "Status", "value": str(status)[:1024], "inline": True},
+                {"name": "Access expires", "value": expiry_text, "inline": False},
+                {"name": "Reference", "value": str(provider_ref)[:1000], "inline": False},
+            ],
+        }],
+        "allowed_mentions": {"parse": []},
+    }
     try:
-        channel = shop_bot.get_channel(channel_id) or await shop_bot.fetch_channel(channel_id)
-        await channel.send(embed=embed, allowed_mentions=discord.AllowedMentions.none())
-    except Exception:
-        app.logger.exception("Could not post purchase log to Discord channel %s", channel_id)
-
-def start_discord_shop_bot():
-    global shop_bot
-    if not DISCORD_BOT_TOKEN:
-        app.logger.warning("Discord shop logging bot is disabled: DISCORD_BOT_TOKEN is missing.")
-        return
-    import threading
-    from discord.ext import commands
-    intents = discord.Intents.default()
-    shop_bot = commands.Bot(command_prefix="!", intents=intents)
-
-    @shop_bot.tree.command(name="shoplog", description="Set this channel as the BLOODFANG purchase log channel")
-    @discord.app_commands.default_permissions(manage_guild=True)
-    async def shoplog(interaction: discord.Interaction):
-        if not interaction.guild or interaction.guild.id != int(DISCORD_GUILD_ID):
-            await interaction.response.send_message("This command can only be used in the configured BLOODFANG server.", ephemeral=True)
-            return
-        if not interaction.user.guild_permissions.manage_guild:
-            await interaction.response.send_message("You need Manage Server permission to set the shop log channel.", ephemeral=True)
-            return
-        with db_connect() as db:
-            db.execute("INSERT INTO app_settings(key,value) VALUES('shoplog_channel_id',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
-                       (str(interaction.channel_id),))
-        await interaction.response.send_message(
-            f"✅ Shop logs will be posted in <#{interaction.channel_id}>. New confirmed membership purchases and subscription renewals will appear here.",
-            ephemeral=True,
+        req = urllib.request.Request(
+            SHOPLOG_WEBHOOK_URL,
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Content-Type": "application/json", "User-Agent": "BLOODFANG-Membership"},
+            method="POST",
         )
-
-    @shop_bot.event
-    async def on_ready():
-        try:
-            guild = discord.Object(id=int(DISCORD_GUILD_ID))
-            shop_bot.tree.copy_global_to(guild=guild)
-            synced = await shop_bot.tree.sync(guild=guild)
-            app.logger.info("Discord shop logging bot ready as %s; synced %s guild commands.", shop_bot.user, len(synced))
-        except Exception:
-            app.logger.exception("Could not sync Discord slash commands")
-
-    def runner():
-        try:
-            shop_bot.run(DISCORD_BOT_TOKEN, log_handler=None)
-        except Exception:
-            app.logger.exception("Discord shop logging bot stopped unexpectedly")
-
-    threading.Thread(target=runner, name="discord-shoplog-bot", daemon=True).start()
-
-# Start after DB initialization so the slash command can safely persist its channel.
-start_discord_shop_bot()
+        with urllib.request.urlopen(req, timeout=8) as response:
+            if response.status >= 300:
+                app.logger.warning("Shop log webhook returned HTTP %s", response.status)
+    except Exception:
+        app.logger.exception("Could not post membership purchase log to Discord")
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", "8080"))
