@@ -106,39 +106,50 @@ def checkout(tier_name):
     user = session.get("discord_user")
     if not user:
         return redirect(url_for("login"))
-    tier = next((tier for tier in TIERS if tier["name"].lower().replace(" ", "-") == tier_name), None)
+    tier = next((t for t in TIERS if t["name"].lower().replace(" ", "-") == tier_name), None)
     if not tier:
-        return render_template("message.html", title="Rank not found",
-                               message="This membership rank does not exist."), 404
-
+        return render_template("message.html", title="Rank not found", message="This membership rank does not exist."), 404
     if request.method == "GET":
         session["checkout_csrf"] = secrets.token_urlsafe(24)
         return render_template("message.html", title="Membership checkout", tier=tier, user=user,
-                               test_mode=ENABLE_TEST_PURCHASES,
-                               csrf_token=session["checkout_csrf"])
-
+                               test_mode=ENABLE_TEST_PURCHASES, csrf_token=session["checkout_csrf"],
+                               payment_mode=True, stripe_enabled=bool(STRIPE_SECRET_KEY),
+                               paypal_enabled=bool(PAYPAL_CLIENT_ID and PAYPAL_CLIENT_SECRET))
     submitted_token = request.form.get("csrf_token", "")
     saved_token = session.pop("checkout_csrf", "")
     if not submitted_token or not saved_token or not secrets.compare_digest(submitted_token, saved_token):
-        return render_template("message.html", title="Checkout expired",
-                               message="Please return to the membership page and try again."), 400
-
-    if not ENABLE_TEST_PURCHASES:
-        return render_template("message.html", title="Payments are not enabled yet",
-                               message="No payment was taken and no role was changed. Enable test mode in Railway to test role assignment, or configure a real payment provider before accepting purchases."), 503
+        return render_template("message.html", title="Checkout expired", message="Please return and try again."), 400
+    purchase_type = request.form.get("purchase_type", "subscription")
+    provider = request.form.get("provider", "").lower()
+    if purchase_type not in ("one_time", "subscription"):
+        return render_template("message.html", title="Invalid purchase type", message="Choose a one-time purchase or monthly subscription."), 400
+    if provider not in ("stripe", "paypal"):
+        return render_template("message.html", title="Choose a payment provider", message="Choose Stripe or PayPal."), 400
+    if not PUBLIC_BASE_URL:
+        return render_template("message.html", title="Website URL missing", message="Set PUBLIC_BASE_URL in Railway to your public https:// website URL."), 503
     if not DISCORD_BOT_TOKEN or not DISCORD_GUILD_ID:
-        return render_template("message.html", title="Role assignment is not configured",
-                               message="Set DISCORD_BOT_TOKEN and DISCORD_GUILD_ID in Railway first."), 503
-
-    import asyncio
+        return render_template("message.html", title="Discord role assignment is not configured", message="Set DISCORD_BOT_TOKEN and DISCORD_GUILD_ID in Railway."), 503
+    if ENABLE_TEST_PURCHASES and request.form.get("test_purchase") == "yes":
+        import asyncio
+        try:
+            asyncio.run(assign_membership_role(user["id"], tier["name"]))
+            save_purchase(user["id"], tier["name"], "test-" + secrets.token_hex(8), purchase_type,
+                          int(time.time()) + 30 * 86400 if purchase_type == "subscription" else None, "test")
+        except Exception as exc:
+            app.logger.exception("Test role assignment failed")
+            return render_template("message.html", title="Could not activate test membership", message=str(exc)), 502
+        return render_template("message.html", title="Test membership activated",
+                               message=f"TEST ONLY: {tier['name']} role assigned. No payment was taken.")
     try:
-        asyncio.run(assign_membership_role(user["id"], tier["name"]))
-    except RuntimeError as exc:
-        app.logger.warning("Membership test role assignment failed for tier %s: %s", tier["name"], exc)
-        return render_template("message.html", title="Could not assign membership role",
-                               message=str(exc)), 502
-    return render_template("message.html", title="Test membership activated",
-                           message=f"TEST ONLY: {tier['name']} was assigned to your Discord account. No payment was taken.")
+        import asyncio
+        if provider == "stripe":
+            checkout_url = asyncio.run(create_stripe_checkout(user, tier, purchase_type))
+        else:
+            checkout_url = asyncio.run(create_paypal_checkout(user, tier, purchase_type))
+    except Exception as exc:
+        app.logger.exception("Could not create %s checkout", provider)
+        return render_template("message.html", title="Checkout could not be started", message=str(exc)), 502
+    return redirect(checkout_url)
 
 
 async def assign_membership_role(user_id, tier_name):
@@ -150,22 +161,358 @@ async def assign_membership_role(user_id, tier_name):
             if response.status != 200:
                 raise RuntimeError(f"Discord could not list server roles (HTTP {response.status}). Check bot token and server access.")
             roles = await response.json()
-        role = next((role for role in roles if role.get("name", "").casefold() == tier_name.casefold()), None)
+        role = next((r for r in roles if r.get("name", "").casefold() == tier_name.casefold()), None)
         if not role:
-            raise RuntimeError(f"The Discord role '{tier_name}' does not exist yet. Create it first or run the role setup command.")
-        async with client.put(
-            f"{base_url}/guilds/{DISCORD_GUILD_ID}/members/{user_id}/roles/{role['id']}",
-            headers=headers,
-            json={},
-        ) as response:
+            raise RuntimeError(f"The Discord role '{tier_name}' does not exist. Create it first.")
+        async with client.put(f"{base_url}/guilds/{DISCORD_GUILD_ID}/members/{user_id}/roles/{role['id']}",
+                              headers=headers, json={}) as response:
             if response.status in (200, 204):
                 return
             if response.status == 404:
-                raise RuntimeError("Your Discord account must already be a member of the BLOODFANG Discord server before the test role can be assigned.")
+                raise RuntimeError("Your Discord account must already be a member of the BLOODFANG server.")
             if response.status == 403:
-                raise RuntimeError("The bot needs Manage Roles, and its highest role must be above the membership role.")
+                raise RuntimeError("The bot needs Manage Roles and its highest role must be above the membership role.")
             raise RuntimeError(f"Discord rejected role assignment (HTTP {response.status}).")
 
+
+async def remove_membership_role(user_id, tier_name):
+    headers = {"Authorization": f"Bot {DISCORD_BOT_TOKEN}"}
+    async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=15)) as client:
+        async with client.get(f"https://discord.com/api/v10/guilds/{DISCORD_GUILD_ID}/roles", headers=headers) as response:
+            if response.status != 200:
+                raise RuntimeError(f"Discord role lookup failed (HTTP {response.status}).")
+            roles = await response.json()
+        role = next((r for r in roles if r.get("name", "").casefold() == tier_name.casefold()), None)
+        if not role:
+            return
+        async with client.delete(f"https://discord.com/api/v10/guilds/{DISCORD_GUILD_ID}/members/{user_id}/roles/{role['id']}",
+                                headers=headers) as response:
+            if response.status not in (200, 204, 404):
+                raise RuntimeError(f"Discord rejected role removal (HTTP {response.status}).")
+
+
+import sqlite3
+import time
+import hmac
+import hashlib
+import json
+from apscheduler.schedulers.background import BackgroundScheduler
+
+DB_PATH = os.environ.get("MEMBERSHIP_DB_PATH", "/data/membership.sqlite3")
+STRIPE_SECRET_KEY = os.environ.get("STRIPE_SECRET_KEY", "")
+STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
+PAYPAL_CLIENT_ID = os.environ.get("PAYPAL_CLIENT_ID", "")
+PAYPAL_CLIENT_SECRET = os.environ.get("PAYPAL_CLIENT_SECRET", "")
+PAYPAL_WEBHOOK_ID = os.environ.get("PAYPAL_WEBHOOK_ID", "")
+PAYPAL_MODE = os.environ.get("PAYPAL_MODE", "sandbox").lower()
+PAYPAL_API = "https://api-m.paypal.com" if PAYPAL_MODE == "live" else "https://api-m.sandbox.paypal.com"
+
+
+def db_connect():
+    os.makedirs(os.path.dirname(DB_PATH) or ".", exist_ok=True)
+    connection = sqlite3.connect(DB_PATH, timeout=15)
+    connection.row_factory = sqlite3.Row
+    return connection
+
+
+def init_db():
+    with db_connect() as db:
+        db.execute("""CREATE TABLE IF NOT EXISTS memberships (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, user_id TEXT NOT NULL, tier_name TEXT NOT NULL,
+            provider TEXT NOT NULL, provider_ref TEXT NOT NULL UNIQUE, purchase_type TEXT NOT NULL,
+            status TEXT NOT NULL, expires_at INTEGER, created_at INTEGER NOT NULL,
+            last_event TEXT
+        )""")
+        db.execute("CREATE INDEX IF NOT EXISTS idx_memberships_expiry ON memberships(status, purchase_type, expires_at)")
+
+
+def save_purchase(user_id, tier_name, provider_ref, purchase_type, expires_at, provider):
+    now = int(time.time())
+    with db_connect() as db:
+        db.execute("""INSERT INTO memberships(user_id,tier_name,provider,provider_ref,purchase_type,status,expires_at,created_at)
+                      VALUES(?,?,?,?,?,'active',?,?) ON CONFLICT(provider_ref) DO UPDATE SET
+                      status='active', expires_at=excluded.expires_at, last_event=NULL""",
+                   (str(user_id), tier_name, provider, str(provider_ref), purchase_type, expires_at, now))
+
+
+async def create_stripe_checkout(user, tier, purchase_type):
+    if not STRIPE_SECRET_KEY:
+        raise RuntimeError("Stripe is not configured: set STRIPE_SECRET_KEY in Railway.")
+    cents = int(round(float(tier["price"].replace(",", ".")) * 100))
+    form = {
+        "mode": "subscription" if purchase_type == "subscription" else "payment",
+        "success_url": PUBLIC_BASE_URL + "/payment/success?session_id={CHECKOUT_SESSION_ID}",
+        "cancel_url": PUBLIC_BASE_URL + "/checkout/" + tier["name"].lower().replace(" ", "-"),
+        "client_reference_id": str(user["id"]),
+        "metadata[discord_user_id]": str(user["id"]),
+        "metadata[tier_name]": tier["name"],
+        "metadata[purchase_type]": purchase_type,
+        "line_items[0][quantity]": "1",
+        "line_items[0][price_data][currency]": "eur",
+        "line_items[0][price_data][unit_amount]": str(cents),
+        "line_items[0][price_data][product_data][name]": "BLOODFANG " + tier["name"] + " membership",
+    }
+    if purchase_type == "subscription":
+        form["line_items[0][price_data][recurring][interval]"] = "month"
+    async with aiohttp.ClientSession() as client:
+        async with client.post("https://api.stripe.com/v1/checkout/sessions", data=form,
+                               auth=aiohttp.BasicAuth(STRIPE_SECRET_KEY, "")) as response:
+            data = await response.json()
+            if response.status >= 300:
+                raise RuntimeError(data.get("error", {}).get("message", "Stripe checkout creation failed."))
+            return data["url"]
+
+
+async def paypal_access_token(client):
+    if not PAYPAL_CLIENT_ID or not PAYPAL_CLIENT_SECRET:
+        raise RuntimeError("PayPal is not configured: set PAYPAL_CLIENT_ID and PAYPAL_CLIENT_SECRET.")
+    async with client.post(PAYPAL_API + "/v1/oauth2/token", data={"grant_type": "client_credentials"},
+                           auth=aiohttp.BasicAuth(PAYPAL_CLIENT_ID, PAYPAL_CLIENT_SECRET)) as response:
+        data = await response.json()
+        if response.status >= 300:
+            raise RuntimeError("PayPal OAuth failed. Check credentials and PAYPAL_MODE.")
+        return data["access_token"]
+
+
+async def create_paypal_checkout(user, tier, purchase_type):
+    async with aiohttp.ClientSession() as client:
+        token = await paypal_access_token(client)
+        headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+        custom_id = json.dumps({"user_id": str(user["id"]), "tier": tier["name"], "type": purchase_type})
+        if purchase_type == "one_time":
+            payload = {"intent": "CAPTURE", "purchase_units": [{
+                "custom_id": custom_id, "description": "BLOODFANG " + tier["name"],
+                "amount": {"currency_code": "EUR", "value": tier["price"].replace(",", ".")}
+            }], "application_context": {"return_url": PUBLIC_BASE_URL + "/paypal/return",
+                                         "cancel_url": PUBLIC_BASE_URL + "/checkout/" + tier["name"].lower().replace(" ", "-")}}
+            async with client.post(PAYPAL_API + "/v2/checkout/orders", headers=headers, json=payload) as response:
+                data = await response.json()
+                if response.status >= 300:
+                    raise RuntimeError("PayPal order creation failed: " + str(data.get("message", "check PayPal setup")))
+                return next(link["href"] for link in data["links"] if link["rel"] == "approve")
+        plan_id = os.environ.get("PAYPAL_PLAN_" + tier["name"].upper().replace(" ", "_"), "")
+        if not plan_id:
+            raise RuntimeError("Set the PayPal monthly plan ID environment variable PAYPAL_PLAN_" + tier["name"].upper().replace(" ", "_") + " first. Create a monthly EUR plan for this tier in PayPal.")
+        payload = {"plan_id": plan_id, "custom_id": custom_id,
+                   "application_context": {"brand_name": "BLOODFANG", "user_action": "SUBSCRIBE_NOW",
+                                           "return_url": PUBLIC_BASE_URL + "/paypal/return",
+                                           "cancel_url": PUBLIC_BASE_URL + "/checkout/" + tier["name"].lower().replace(" ", "-")}}
+        async with client.post(PAYPAL_API + "/v1/billing/subscriptions", headers=headers, json=payload) as response:
+            data = await response.json()
+            if response.status >= 300:
+                raise RuntimeError("PayPal subscription creation failed: " + str(data.get("message", "check plan ID and PayPal setup")))
+            return next(link["href"] for link in data["links"] if link["rel"] == "approve")
+
+
+@app.get("/payment/success")
+def payment_success():
+    return render_template("message.html", title="Payment processing",
+                           message="Thank you. Your payment is being verified. Your Discord role is assigned only after the provider confirms payment. If it does not appear shortly, contact staff.")
+
+
+@app.get("/paypal/return")
+def paypal_return():
+    order_id = request.args.get("token")
+    subscription_id = request.args.get("subscription_id")
+    if not order_id and not subscription_id:
+        return redirect(url_for("index"))
+    import asyncio
+    try:
+        if order_id:
+            result = asyncio.run(capture_paypal_order(order_id))
+            if result:
+                user_id, tier_name, ref = result
+                asyncio.run(assign_membership_role(user_id, tier_name))
+                save_purchase(user_id, tier_name, ref, "one_time", None, "paypal")
+                return render_template("message.html", title="Purchase complete",
+                                       message=f"Your {tier_name} role has been activated. This was a one-time purchase.")
+        return render_template("message.html", title="Subscription pending",
+                               message="PayPal is confirming your subscription. Your role will be activated after a verified payment webhook.")
+    except Exception:
+        app.logger.exception("PayPal return processing failed")
+        return render_template("message.html", title="Payment verification pending",
+                               message="We could not verify the payment yet. Please contact staff before paying again."), 502
+
+
+async def capture_paypal_order(order_id):
+    async with aiohttp.ClientSession() as client:
+        token = await paypal_access_token(client)
+        headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+        async with client.post(f"{PAYPAL_API}/v2/checkout/orders/{order_id}/capture", headers=headers, json={}) as response:
+            data = await response.json()
+            if response.status >= 300 and data.get("status") != "COMPLETED":
+                raise RuntimeError("PayPal capture was not successful.")
+        unit = data.get("purchase_units", [{}])[0]
+        custom = json.loads(unit.get("payments", {}).get("captures", [{}])[0].get("custom_id") or unit.get("custom_id") or "{}")
+        if data.get("status") != "COMPLETED" or not custom.get("user_id") or not custom.get("tier"):
+            return None
+        return str(custom["user_id"]), custom["tier"], "paypal-order-" + order_id
+
+
+async def verify_paypal_webhook(headers, event):
+    if not PAYPAL_WEBHOOK_ID:
+        return False
+    async with aiohttp.ClientSession() as client:
+        token = await paypal_access_token(client)
+        payload = {"auth_algo": headers.get("PAYPAL-AUTH-ALGO"), "cert_url": headers.get("PAYPAL-CERT-URL"),
+                   "transmission_id": headers.get("PAYPAL-TRANSMISSION-ID"), "transmission_sig": headers.get("PAYPAL-TRANSMISSION-SIG"),
+                   "transmission_time": headers.get("PAYPAL-TRANSMISSION-TIME"), "webhook_id": PAYPAL_WEBHOOK_ID, "webhook_event": event}
+        async with client.post(PAYPAL_API + "/v1/notifications/verify-webhook-signature",
+                               headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+                               json=payload) as response:
+            data = await response.json()
+            return response.status == 200 and data.get("verification_status") == "SUCCESS"
+
+
+@app.post("/webhooks/stripe")
+def stripe_webhook():
+    if not STRIPE_WEBHOOK_SECRET:
+        return {"error": "webhook not configured"}, 503
+    raw = request.get_data()
+    signature = request.headers.get("Stripe-Signature", "")
+    try:
+        parts = dict(item.split("=", 1) for item in signature.split(",") if "=" in item)
+        timestamp = parts.get("t", "")
+        expected = hmac.new(STRIPE_WEBHOOK_SECRET.encode(), timestamp.encode() + b"." + raw, hashlib.sha256).hexdigest()
+        if not timestamp or abs(int(time.time()) - int(timestamp)) > 300 or not any(hmac.compare_digest(expected, sig) for sig in parts.get("v1", "").split()):
+            return {"error": "invalid signature"}, 400
+        event = json.loads(raw)
+    except Exception:
+        return {"error": "invalid payload"}, 400
+    import asyncio
+    kind = event.get("type")
+    obj = event.get("data", {}).get("object", {})
+    metadata = obj.get("metadata", {})
+    user_id = metadata.get("discord_user_id")
+    tier_name = metadata.get("tier_name")
+    purchase_type = metadata.get("purchase_type")
+    ref = str(obj.get("id", ""))
+    if kind == "checkout.session.completed":
+        user_id = user_id or obj.get("client_reference_id")
+        if obj.get("mode") == "payment" and obj.get("payment_status") == "paid" and user_id and tier_name:
+            try:
+                asyncio.run(assign_membership_role(user_id, tier_name))
+                save_purchase(user_id, tier_name, ref, "one_time", None, "stripe")
+            except Exception:
+                app.logger.exception("Stripe one-time role activation failed")
+                return {"error": "activation failed; retry webhook"}, 500
+        elif obj.get("mode") == "subscription" and user_id and tier_name:
+            subscription_ref = str(obj.get("subscription") or ref)
+            with db_connect() as db:
+                db.execute("""INSERT INTO memberships(user_id,tier_name,provider,provider_ref,purchase_type,status,expires_at,created_at)
+                    VALUES(?,?,?,?, 'subscription','pending',NULL,?) ON CONFLICT(provider_ref) DO NOTHING""",
+                    (str(user_id), tier_name, "stripe", subscription_ref, int(time.time())))
+    elif kind == "invoice.paid":
+        # Stripe subscription metadata may be attached to the subscription, so retrieve it.
+        subscription_ref = str(obj.get("subscription") or "")
+        try:
+            asyncio.run(activate_stripe_subscription(subscription_ref, ref))
+        except Exception:
+            app.logger.exception("Stripe recurring payment activation failed")
+            return {"error": "activation failed; retry webhook"}, 500
+    elif kind in ("customer.subscription.deleted", "customer.subscription.paused"):
+        sub_ref = str(obj.get("id", ""))
+        with db_connect() as db:
+            db.execute("UPDATE memberships SET status='cancelled', expires_at=? WHERE provider_ref=? AND purchase_type='subscription'",
+                       (int(time.time()), sub_ref))
+    return {"received": True}
+
+
+async def activate_stripe_subscription(subscription_ref, invoice_ref):
+    if not STRIPE_SECRET_KEY or not subscription_ref:
+        return
+    async with aiohttp.ClientSession() as client:
+        async with client.get(f"https://api.stripe.com/v1/subscriptions/{subscription_ref}",
+                              auth=aiohttp.BasicAuth(STRIPE_SECRET_KEY, "")) as response:
+            data = await response.json()
+            if response.status >= 300:
+                raise RuntimeError("Could not retrieve Stripe subscription metadata.")
+    meta = data.get("metadata", {})
+    user_id, tier_name = meta.get("discord_user_id"), meta.get("tier_name")
+    if not user_id or not tier_name:
+        return
+    expires_at = int(data.get("current_period_end") or (time.time() + 30 * 86400))
+    import asyncio
+    await assign_membership_role(user_id, tier_name)
+    with db_connect() as db:
+        db.execute("""INSERT INTO memberships(user_id,tier_name,provider,provider_ref,purchase_type,status,expires_at,created_at,last_event)
+                      VALUES(?,?, 'stripe', ?, 'subscription','active',?,?,?)
+                      ON CONFLICT(provider_ref) DO UPDATE SET status='active', expires_at=excluded.expires_at, last_event=excluded.last_event""",
+                   (str(user_id), tier_name, subscription_ref, expires_at, int(time.time()), invoice_ref))
+
+
+@app.post("/webhooks/paypal")
+def paypal_webhook():
+    event = request.get_json(silent=True) or {}
+    import asyncio
+    try:
+        if not asyncio.run(verify_paypal_webhook(request.headers, event)):
+            return {"error": "invalid PayPal signature"}, 400
+    except Exception:
+        app.logger.exception("PayPal webhook verification failed")
+        return {"error": "verification failed"}, 400
+    event_type = event.get("event_type", "")
+    resource = event.get("resource", {})
+    if event_type == "BILLING.SUBSCRIPTION.ACTIVATED":
+        custom = resource.get("custom_id") or ""
+        try:
+            meta = json.loads(custom)
+            user_id, tier_name = str(meta["user_id"]), meta["tier"]
+            sub_id = str(resource["id"])
+            expires_at = int(time.time()) + 30 * 86400
+            import asyncio
+            asyncio.run(assign_membership_role(user_id, tier_name))
+            save_purchase(user_id, tier_name, "paypal-sub-" + sub_id, "subscription", expires_at, "paypal")
+        except Exception:
+            app.logger.exception("Could not activate PayPal subscription")
+            return {"error": "activation failed"}, 500
+    elif event_type in ("PAYMENT.SALE.COMPLETED", "PAYMENT.CAPTURE.COMPLETED"):
+        # For subscriptions, a completed sale extends the access window from its payment time.
+        billing_agreement_id = resource.get("billing_agreement_id") or resource.get("supplementary_data", {}).get("related_ids", {}).get("subscription_id")
+        if billing_agreement_id:
+            provider_ref = "paypal-sub-" + str(billing_agreement_id)
+            with db_connect() as db:
+                row = db.execute("SELECT user_id,tier_name FROM memberships WHERE provider_ref=?", (provider_ref,)).fetchone()
+            if row:
+                expires_at = int(time.time()) + 30 * 86400
+                import asyncio
+                try:
+                    asyncio.run(assign_membership_role(row["user_id"], row["tier_name"]))
+                    with db_connect() as db:
+                        db.execute("UPDATE memberships SET status='active', expires_at=?, last_event=? WHERE provider_ref=?",
+                                   (expires_at, str(event.get("id", "")), provider_ref))
+                except Exception:
+                    app.logger.exception("Could not extend PayPal subscription")
+                    return {"error": "activation failed"}, 500
+    elif event_type in ("BILLING.SUBSCRIPTION.CANCELLED", "BILLING.SUBSCRIPTION.EXPIRED", "BILLING.SUBSCRIPTION.SUSPENDED"):
+        sub_id = str(resource.get("id", ""))
+        with db_connect() as db:
+            db.execute("UPDATE memberships SET status='cancelled', expires_at=? WHERE provider_ref=?",
+                       (int(time.time()), "paypal-sub-" + sub_id))
+    return {"received": True}
+
+
+def expire_memberships():
+    now = int(time.time())
+    with db_connect() as db:
+        rows = db.execute("""SELECT id,user_id,tier_name,provider_ref FROM memberships
+                             WHERE purchase_type='subscription' AND status='active' AND expires_at IS NOT NULL AND expires_at<=?""",
+                          (now,)).fetchall()
+    import asyncio
+    for row in rows:
+        try:
+            asyncio.run(remove_membership_role(row["user_id"], row["tier_name"]))
+            with db_connect() as db:
+                db.execute("UPDATE memberships SET status='expired', last_event='expiry-job' WHERE id=? AND status='active'", (row["id"],))
+            app.logger.info("Expired membership role removed user=%s tier=%s", row["user_id"], row["tier_name"])
+        except Exception:
+            app.logger.exception("Could not expire membership id=%s; will retry", row["id"])
+
+
+init_db()
+_scheduler = BackgroundScheduler(daemon=True)
+_scheduler.add_job(expire_memberships, "interval", minutes=5, id="expire_memberships", max_instances=1, replace_existing=True)
+_scheduler.start()
 @app.get("/logout")
 def logout():
     session.clear()
