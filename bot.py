@@ -1,6 +1,9 @@
 import logging
 import os
 import asyncio
+import random
+import sqlite3
+import time
 
 import discord
 import aiohttp
@@ -18,7 +21,7 @@ if not TOKEN:
 
 intents = discord.Intents.default()
 intents.message_content = True
-bot = commands.Bot(command_prefix="!", intents=intents, status=discord.Status.online, help_command=None)
+bot = commands.Bot(command_prefix=[".", "!"], intents=intents, status=discord.Status.online, help_command=None)
 
 STATUS_ACTIVITIES = [
     discord.Game(name="!membership"),
@@ -45,6 +48,146 @@ POINT_PACKAGES = [
     ("150,000,000", "€230.00"),
     ("300,000,000", "€350.00"),
 ]
+
+
+# Lightweight persistent Discord economy copied from Evrima-bot.
+# Mount a Railway Volume at /data, or set ECONOMY_DB to a persistent file path.
+ECONOMY_DB_PATH = os.path.abspath(os.environ.get("ECONOMY_DB", "/data/economy.db"))
+os.makedirs(os.path.dirname(ECONOMY_DB_PATH), exist_ok=True)
+economy_db = sqlite3.connect(ECONOMY_DB_PATH, timeout=30, check_same_thread=False)
+economy_db.execute("PRAGMA busy_timeout = 30000")
+economy_db.execute("PRAGMA journal_mode = WAL")
+economy_db.execute("CREATE TABLE IF NOT EXISTS accounts (user_id INTEGER PRIMARY KEY, balance INTEGER NOT NULL DEFAULT 100)")
+economy_db.execute("""CREATE TABLE IF NOT EXISTS economy_cooldowns (
+    user_id INTEGER NOT NULL, command TEXT NOT NULL, last_used REAL NOT NULL,
+    PRIMARY KEY(user_id, command))""")
+economy_db.commit()
+ECONOMY_COOLDOWN_SECONDS = 3 * 60 * 60
+ECONOMY_ACTION_MIN = 1500
+ECONOMY_ACTION_MAX = 10000
+
+
+def get_balance(user_id: int) -> int:
+    row = economy_db.execute("SELECT balance FROM accounts WHERE user_id = ?", (user_id,)).fetchone()
+    if row is None:
+        with economy_db:
+            economy_db.execute("INSERT OR IGNORE INTO accounts (user_id, balance) VALUES (?, 100)", (user_id,))
+        row = economy_db.execute("SELECT balance FROM accounts WHERE user_id = ?", (user_id,)).fetchone()
+    return int(row[0])
+
+
+def change_balance(user_id: int, amount: int) -> int:
+    get_balance(user_id)
+    with economy_db:
+        economy_db.execute("UPDATE accounts SET balance = balance + ? WHERE user_id = ?", (amount, user_id))
+    return get_balance(user_id)
+
+
+def cooldown_left(user_id: int, command: str) -> int:
+    row = economy_db.execute("SELECT last_used FROM economy_cooldowns WHERE user_id = ? AND command = ?",
+                             (user_id, command)).fetchone()
+    if row is None:
+        return 0
+    return max(0, int(ECONOMY_COOLDOWN_SECONDS - (time.time() - row[0]) + 0.999))
+
+
+def use_cooldown(user_id: int, command: str) -> None:
+    with economy_db:
+        economy_db.execute(
+            """INSERT INTO economy_cooldowns (user_id, command, last_used) VALUES (?, ?, ?)
+               ON CONFLICT(user_id, command) DO UPDATE SET last_used = excluded.last_used""",
+            (user_id, command, time.time()))
+
+
+def economy_cooldown_message(left: int, command: str) -> str:
+    names = {"work": ".w/.work", "crime": ".crime", "cheat": ".cheat"}
+    return f"⏳ **{names.get(command, command)}** will be available again in **{left // 3600}h {(left % 3600) // 60}m {left % 60}s**."
+
+
+@bot.command(name="balance", aliases=["bal", "konto"])
+async def balance(ctx, member: discord.Member = None):
+    """Show your own balance or the balance of a mentioned member."""
+    member = member or ctx.author
+    amount = get_balance(member.id)
+    embed = discord.Embed(title="🏦 Balance",
+        description=f"**Player:** {member.mention}\\n**Balance:** **{amount:,} Coins**".replace(",", "."),
+        color=discord.Color.gold())
+    embed.set_thumbnail(url=member.display_avatar.url)
+    await ctx.send(embed=embed)
+
+
+@bot.command(name="w", aliases=["work"])
+async def work(ctx):
+    left = cooldown_left(ctx.author.id, "work")
+    if left:
+        return await ctx.send(economy_cooldown_message(left, "work"))
+    use_cooldown(ctx.author.id, "work")
+    earned = random.randint(ECONOMY_ACTION_MIN, ECONOMY_ACTION_MAX)
+    total = change_balance(ctx.author.id, earned)
+    await ctx.send(f"🛠️ Work complete! You earned **{earned:,} Coins**. Balance: **{total:,} Coins**.".replace(",", "."))
+
+
+@bot.command(name="crime", aliases=["c"])
+async def crime(ctx):
+    left = cooldown_left(ctx.author.id, "crime")
+    if left:
+        return await ctx.send(economy_cooldown_message(left, "crime"))
+    current = get_balance(ctx.author.id)
+    if current < ECONOMY_ACTION_MIN:
+        return await ctx.send(f"❌ You need at least **{ECONOMY_ACTION_MIN:,} Coins** in your balance to use .crime.".replace(",", "."))
+    use_cooldown(ctx.author.id, "crime")
+    if random.random() < 0.45:
+        amount = random.randint(ECONOMY_ACTION_MIN, ECONOMY_ACTION_MAX)
+        total = change_balance(ctx.author.id, amount)
+        await ctx.send(f"🚨 The heist was successful! **+{amount:,} Coins**. Balance: **{total:,} Coins**.".replace(",", "."))
+    else:
+        amount = random.randint(ECONOMY_ACTION_MIN, min(ECONOMY_ACTION_MAX, current))
+        total = change_balance(ctx.author.id, -amount)
+        await ctx.send(f"👮 You were caught! You lost **{amount:,} Coins**. Balance: **{total:,} Coins**.".replace(",", "."))
+
+
+@bot.command(name="cheat")
+async def cheat(ctx):
+    left = cooldown_left(ctx.author.id, "cheat")
+    if left:
+        return await ctx.send(economy_cooldown_message(left, "cheat"))
+    current = get_balance(ctx.author.id)
+    if current < ECONOMY_ACTION_MIN:
+        return await ctx.send(f"❌ You need at least **{ECONOMY_ACTION_MIN:,} Coins** in your balance to use .cheat.".replace(",", "."))
+    use_cooldown(ctx.author.id, "cheat")
+    if random.random() < 0.5:
+        amount = random.randint(ECONOMY_ACTION_MIN, ECONOMY_ACTION_MAX)
+        total = change_balance(ctx.author.id, amount)
+        await ctx.send(f"🎲 Lucky! **+{amount:,} Coins**. Balance: **{total:,} Coins**.".replace(",", "."))
+    else:
+        amount = random.randint(ECONOMY_ACTION_MIN, min(ECONOMY_ACTION_MAX, current))
+        total = change_balance(ctx.author.id, -amount)
+        await ctx.send(f"💸 Unlucky! You lost **{amount:,} Coins**. Balance: **{total:,} Coins**.".replace(",", "."))
+
+
+@bot.command(name="pay", aliases=["transfer"])
+async def pay(ctx, member: discord.Member, amount: int):
+    if member.bot:
+        return await ctx.send("❌ You cannot transfer money to bots.")
+    if member.id == ctx.author.id:
+        return await ctx.send("❌ You cannot transfer money to yourself.")
+    if amount <= 0:
+        return await ctx.send("❌ The amount must be greater than 0.")
+    if get_balance(ctx.author.id) < amount:
+        return await ctx.send(f"❌ You do not have enough Coins. Balance: **{get_balance(ctx.author.id)} Coins**.")
+    try:
+        with economy_db:
+            get_balance(ctx.author.id)
+            get_balance(member.id)
+            sender_balance = economy_db.execute("SELECT balance FROM accounts WHERE user_id = ?", (ctx.author.id,)).fetchone()[0]
+            if sender_balance < amount:
+                return await ctx.send(f"❌ You do not have enough Coins. Balance: **{sender_balance} Coins**.")
+            economy_db.execute("UPDATE accounts SET balance = balance - ? WHERE user_id = ?", (amount, ctx.author.id))
+            economy_db.execute("UPDATE accounts SET balance = balance + ? WHERE user_id = ?", (amount, member.id))
+        await ctx.send(f"💸 {ctx.author.mention} transferred **{amount:,} Coins** to {member.mention}. New balance: **{get_balance(ctx.author.id):,} Coins**.".replace(",", "."))
+    except sqlite3.Error:
+        log.exception("Economy transfer failed")
+        await ctx.send("❌ The transfer failed. Please try again later.")
 
 
 async def send_offer_dm(ctx, title, description, fields, footer):
