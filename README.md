@@ -68,3 +68,20 @@ Only set variables on this new service that it needs. Do not change the existing
 - OAuth state is checked on callback to reduce CSRF risk.
 - The website currently only identifies a Discord user; it does not grant roles or process payments.
 - PayPal integration will be added separately later, starting with sandbox mode and verified webhooks.
+
+
+## Legal launch checklist (Germany / international audience)
+
+The legal pages in the website are **draft templates only** and do not establish legal compliance. The operator has currently indicated: Germany, private individual, no registered business, and international target audience. This does not itself determine whether the planned recurring paid membership is a trade/business or which tax, consumer, privacy, or registration duties apply.
+
+Before accepting any payment:
+- Replace every bracketed placeholder on `/imprint`, `/privacy`, `/terms`, and `/withdrawal`. Do not publish invented identity or contact details.
+- Obtain advice on whether the planned ongoing paid membership requires Gewerbeanmeldung, tax registration, invoicing/VAT steps, or other formalities in Germany.
+- Confirm the operator's legal name, a legally valid postal address, email and an additional direct/rapid contact method, plus any applicable register, VAT, supervisory, chamber, or media-law disclosures.
+- Verify the privacy notice against GDPR Article 13, the real Discord OAuth fields/scopes, Railway/hosting logs, session-cookie settings, provider terms, retention, and any international transfers.
+- Prepare accurate pre-contract information, total prices/tax treatment, recurring billing/renewal and cancellation terms, payment details, consumer withdrawal notice and statutory model form, and complaint/support contact details.
+- Assess whether a German online cancellation button and confirmation process under § 312k BGB is required for the subscription model.
+- Ensure all advertised benefits are actually implemented before promising them. Add no analytics, advertising cookies, payment processors, or extra data collection without updating the privacy review.
+- Obtain a qualified legal/tax review for the operator's actual circumstances and the countries targeted. International targeting can trigger additional consumer and tax requirements.
+
+Until this checklist is reviewed and all placeholders are completed, keep payment processing disabled. The website currently does not take payments.
