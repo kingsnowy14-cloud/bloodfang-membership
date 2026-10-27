@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>My Memberships | BLOODFANG</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+<style>
+.membership-list{display:grid;gap:1rem;margin-top:2rem}.membership-card{border:1px solid #393039;background:#151216;padding:1.25rem;border-radius:12px}.membership-card h2{margin:.2rem 0}.membership-meta{color:#c5bac5;display:flex;gap:1rem;flex-wrap:wrap;margin:.8rem 0}.status-pill{display:inline-block;border:1px solid #6e4a55;padding:.25rem .6rem;border-radius:999px;font-size:.8rem}.cancel-form{margin-top:1rem}.cancel-button{background:#6d202c;color:white;border:0;border-radius:8px;padding:.7rem 1rem;cursor:pointer}.muted{color:#b7aeb8}
+</style>
+</head>
+<body>
+<header class="topbar"><a class="brand" href="/">BLOOD<span>FANG</span></a><nav><a class="navbtn" href="/">Home</a><a class="navbtn" href="/#ranks">Membership</a><a class="navbtn" href="/my-memberships">My Memberships</a><a class="navbtn" href="/logout">Sign out</a></nav></header>
+<main class="section">
+<div class="eyebrow">YOUR ACCOUNT</div><h1>My Memberships</h1>
+<p>Track your purchases, access periods, and subscriptions in one place.</p>
+{% if purchases %}
+<div class="membership-list">
+{% for p in purchases %}
+<article class="membership-card">
+<div class="eyebrow">{{ p.tier_name }}</div>
+<h2>{% if p.purchase_type == 'subscription' %}Monthly subscription{% else %}30-day purchase{% endif %}</h2>
+<div class="membership-meta">
+<span class="status-pill">{% if p.status == 'active' and p.expires_at and p.expires_at > now %}Purchased · Active{% elif p.status == 'pending' %}Payment pending{% elif p.status == 'expired' or (p.expires_at and p.expires_at <= now) %}Expired{% elif p.last_event == 'cancelled_by_member' %}Auto-renewal cancelled{% else %}{{ p.status|title }}{% endif %}</span>
+{% if p.expires_at %}<span>{% if p.expires_at > now %}Access until{% else %}Expired on{% endif %}: {{ p.expires_at|int|datetimeformat if false else (p.expires_at|int) }}</span>{% else %}<span>Permanent access</span>{% endif %}
+<span>Payment: PayPal</span>
+</div>
+{% if p.purchase_type == 'subscription' and p.status == 'active' and p.last_event != 'cancelled_by_member' %}
+<form class="cancel-form" method="post" action="/cancel-membership/{{ p.id }}" onsubmit="return confirm('Cancel automatic monthly renewal? Your role remains until your paid period ends.');">
+<button class="cancel-button" type="submit">Cancel automatic renewal</button>
+</form>
+{% elif p.purchase_type == 'subscription' and p.last_event == 'cancelled_by_member' %}
+<p class="muted">Automatic renewal is cancelled. Your role will be removed when your paid access expires.</p>
+{% endif %}
+</article>
+{% endfor %}
+</div>
+{% else %}
+<p class="muted">You have no recorded purchases yet. Once a payment is confirmed, your membership will appear here.</p>
+{% endif %}
+<p style="margin-top:2rem"><a class="primary" href="/#ranks">Browse memberships</a></p>
+</main>
+<footer><a class="brand" href="/">BLOOD<span>FANG</span></a><span>Membership account</span><nav class="legal-links"><a href="/privacy">Privacy</a><a href="/terms">Terms</a></nav></footer>
+</body></html>
