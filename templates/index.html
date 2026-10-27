@@ -34,12 +34,17 @@
 <div class="tiers">{% for tier in tiers %}<article class="tier {% if tier.name in ['APEX','BLOOD EMPEROR','BLOOD TITAN','BLOOD GOD'] %}elite{% endif %}">
 <div class="tier-top"><span class="emoji">{{ tier.emoji }}</span><span class="tier-index">{{ "%02d"|format(loop.index) }}</span></div>
 <h3>{{ tier.name }}</h3><div class="price">€{{ tier.price }}<small> / month</small></div>
+<label class="purchase-choice-label" for="purchase-{{ loop.index }}">Choose your payment option</label>
+<select class="purchase-choice" id="purchase-{{ loop.index }}" onchange="const button=this.closest('.tier').querySelector('.tier-button'); button.href='/checkout/{{ tier.name|lower|replace(' ', '-') }}?purchase_type='+this.value;">
+<option value="subscription" selected>Pay monthly — €{{ tier.price }} every month</option>
+<option value="one_time">Pay once — access for 30 days</option>
+</select>
 <div class="benefits"><div><span>Bloodpoints / day</span><strong>{{ tier.points }}</strong></div><div><span>Storage slots</span><strong>{{ tier.storage }}</strong></div><div><span>Discord role</span><strong>Included</strong></div>
 {% if tier.name in ['APEX','BLOOD EMPEROR','BLOOD TITAN','BLOOD GOD'] %}<div><span>Rank icon</span><strong>Planned</strong></div>{% endif %}
 {% if tier.name in ['BLOOD TITAN','BLOOD GOD'] %}<div><span>Priority Support</span><strong>Included</strong></div>{% endif %}</div>
-{% if user %}<a class="tier-button" href="/checkout/{{ tier.name|lower|replace(' ', '-') }}">Subscribe monthly <span>↗</span></a>{% else %}<a class="tier-button" href="/login">Connect Discord <span>↗</span></a>{% endif %}
+{% if user %}<a class="tier-button" href="/checkout/{{ tier.name|lower|replace(' ', '-') }}">Continue <span>↗</span></a>{% else %}<a class="tier-button" href="/login">Connect Discord <span>↗</span></a>{% endif %}
 </article>{% endfor %}</div>
-<p class="disclaimer"><strong>Monthly membership:</strong> All displayed prices are per month. Payments are not enabled yet, and no money will be charged.</p><p class="disclaimer">Note: Bloodpoints, storage slots, and other in-game benefits will only be activated once technically supported and configured on the Evrima server. Membership payments are not enabled yet.</p>
+<p class="disclaimer"><strong>Choose your payment:</strong> Monthly subscriptions renew every month. A one-time payment grants the selected rank and listed benefits for 30 days, with no automatic renewal.</p><p class="disclaimer">Note: Bloodpoints, storage slots, and other in-game benefits will only be activated once technically supported and configured on the Evrima server. Membership payments are not enabled yet.</p>
 </section>
 <section class="cta"><div class="eyebrow">YOUR RANK. YOUR RULES.</div><h2>Ready to hunt?</h2><p>Connect Discord and become part of the BLOODFANG community.</p><div class="welcome-actions"><a class="primary" href="/login">Connect Discord <span>↗</span></a><a class="primary discord-join" href="https://discord.gg/fHVxUbWX94" target="_blank" rel="noopener noreferrer">Join Discord <span>↗</span></a></div></section>
 </main><footer><a class="brand" href="/">BLOOD<span>FANG</span></a><span>Fan community · The Isle: Evrima</span><span>Membership portal · payments not active</span><nav class="legal-links"><a href="/imprint">Legal Notice</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="/withdrawal">Withdrawal & Cancellation</a></nav></footer>
