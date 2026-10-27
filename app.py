@@ -541,7 +541,13 @@ def withdrawal():
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "payments": "not_configured"}
+    return {
+        "status": "ok",
+        "stripe_configured": bool(STRIPE_SECRET_KEY and STRIPE_WEBHOOK_SECRET),
+        "paypal_configured": bool(PAYPAL_CLIENT_ID and PAYPAL_CLIENT_SECRET and PAYPAL_WEBHOOK_ID),
+        "discord_roles_configured": bool(DISCORD_BOT_TOKEN and DISCORD_GUILD_ID),
+        "database_path": DB_PATH,
+    }
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", "8080"))
