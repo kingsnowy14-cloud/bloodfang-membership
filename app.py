@@ -37,6 +37,10 @@ POINT_PACKAGES = [
 def index():
     return render_template("index.html", tiers=TIERS, points=POINT_PACKAGES, user=session.get("discord_user"))
 
+@app.get("/points-shop")
+def points_shop():
+    return render_template("points.html", points=POINT_PACKAGES, user=session.get("discord_user"))
+
 @app.get("/login")
 def login():
     if not DISCORD_CLIENT_ID or not DISCORD_REDIRECT_URI:
