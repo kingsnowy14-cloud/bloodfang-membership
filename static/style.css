@@ -21,3 +21,14 @@ body.welcome-locked{touch-action:none}
 .gate-foot{margin-top:36px;color:#796b70;font-size:10px;font-weight:700;letter-spacing:4px}
 .welcome-gate-hidden{opacity:0;visibility:hidden;pointer-events:none}
 @media(max-width:560px){.welcome-gate:before{inset:9px}.welcome-gate-content{padding:24px 0}.welcome-gate h1{font-size:clamp(54px,15vw,78px)}.gate-actions{max-width:320px;margin:0 auto;flex-direction:column;align-items:stretch}.gate-actions .primary{justify-content:space-between}.gate-foot{letter-spacing:2px}}
+
+/* Purchase statistics panels. These explicitly show that real sales data is not available yet. */
+.sales-stats{display:flex;align-items:center;gap:18px;margin:0 0 34px;padding:20px 22px;border:1px solid #493038;background:linear-gradient(110deg,#211116,#131013 72%);position:relative;overflow:hidden}
+.sales-stats-icon{width:44px;height:44px;flex:0 0 44px;display:grid;place-items:center;border:1px solid #71313d;background:#30151c;color:#f05a6b;font-size:24px}
+.sales-stats-copy{display:flex;flex-direction:column;gap:6px;min-width:0}
+.sales-stats-copy>strong{font:800 24px/1 'Barlow Condensed',sans-serif;text-transform:uppercase;letter-spacing:.6px}
+.sales-stats-copy>span{font-size:12px;color:#bfb2b6;line-height:1.5}
+.sales-stats-copy>span b{color:#f5e9eb}
+.sales-stats-copy small{font-size:10px;line-height:1.6;color:#95868b;margin-top:2px}
+.stats-status{margin-left:auto;flex-shrink:0;border:1px solid #574149;padding:8px 10px;color:#d7a0a8;font-size:9px;font-weight:800;letter-spacing:1px;text-align:center}
+@media(max-width:650px){.sales-stats{align-items:flex-start;gap:12px;padding:16px}.sales-stats-icon{width:36px;height:36px;flex-basis:36px}.sales-stats-copy>strong{font-size:21px}.stats-status{display:none}}
