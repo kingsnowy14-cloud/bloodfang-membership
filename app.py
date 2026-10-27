@@ -85,6 +85,17 @@ async def fetch_discord_user(code):
             "global_name": data.get("global_name") or data["username"],
             "avatar": data.get("avatar")}
 
+@app.get("/checkout/<tier_name>")
+def checkout(tier_name):
+    if not session.get("discord_user"):
+        return redirect(url_for("login"))
+    tier = next((tier for tier in TIERS if tier["name"].lower().replace(" ", "-") == tier_name), None)
+    if not tier:
+        return render_template("message.html", title="Rang nicht gefunden",
+                               message="Dieser Membership-Rang existiert nicht."), 404
+    return render_template("message.html", title="Monatlicher Kauf noch nicht aktiviert",
+                           message=f"Du bist mit Discord angemeldet. Das Abo für {tier['name']} kostet €{tier['price']} pro Monat. Die Zahlung ist noch nicht aktiviert; es wird nichts abgebucht."), 503
+
 @app.get("/logout")
 def logout():
     session.clear()
