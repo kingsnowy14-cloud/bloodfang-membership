@@ -122,15 +122,14 @@ async def shoplog(interaction: discord.Interaction):
         await interaction.response.send_message("I need the Manage Webhooks permission in this channel to set up purchase logs.", ephemeral=True)
         return
     try:
-        hooks = await interaction.channel.webhooks()
-        webhook = next((hook for hook in hooks if hook.name == "BLOODFANG Shop Logs" and hook.user == bot.user), None)
-        if webhook is None:
-            webhook = await interaction.channel.create_webhook(name="BLOODFANG Shop Logs", reason=f"Shop logs configured by {interaction.user}")
+        # Discord does not return webhook tokens when listing existing webhooks,
+        # so create a fresh one to ensure the secret URL can be shown to the admin.
+        webhook = await interaction.channel.create_webhook(name="BLOODFANG Shop Logs", reason=f"Shop logs configured by {interaction.user}")
     except discord.Forbidden:
-        await interaction.response.send_message("I cannot manage webhooks here. Give me Manage Webhooks permission and try again.", ephemeral=True)
+        await interaction.response.send_message("I cannot create a webhook here. Give me Manage Webhooks permission and try again.", ephemeral=True)
         return
     await interaction.response.send_message(
-        "✅ Shop-log webhook created for this channel. One final setup step is required: copy the webhook URL below into the Railway website/membership service as the variable SHOPLOG_WEBHOOK_URL, then redeploy. Treat this URL like a password.\n\n"
+        "✅ Shop-log webhook is ready for this channel. One final setup step is required: copy the webhook URL below into the Railway website/membership service as the variable SHOPLOG_WEBHOOK_URL, then redeploy. Treat this URL like a password.\n\n"
         + f"||{webhook.url}||",
         ephemeral=True,
     )
