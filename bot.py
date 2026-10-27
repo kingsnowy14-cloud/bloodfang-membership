@@ -1,5 +1,6 @@
 import logging
 import os
+import asyncio
 
 import discord
 import aiohttp
