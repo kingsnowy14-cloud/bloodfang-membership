@@ -2,6 +2,7 @@ import logging
 import os
 
 import discord
+import aiohttp
 from discord.ext import commands, tasks
 
 logging.basicConfig(
@@ -107,6 +108,81 @@ async def rotate_status():
     )
     log.info("Rotated bot activity to %s", STATUS_ACTIVITIES[_status_index].name)
 
+
+
+@bot.tree.command(name="mymembership", description="Show your BLOODFANG membership status")
+async def mymembership(interaction: discord.Interaction):
+    if not interaction.guild or interaction.guild.id != int(os.environ.get("DISCORD_GUILD_ID", "1561027077984227371")):
+        await interaction.response.send_message("This command can only be used in the configured BLOODFANG server.", ephemeral=True)
+        return
+
+    api_url = os.environ.get("MEMBERSHIP_API_URL", "https://bloodfang-membership.up.railway.app").rstrip("/")
+    api_key = os.environ.get("SHOP_API_KEY", "").strip()
+    if not api_key:
+        await interaction.response.send_message(
+            "Membership lookup is not configured yet. Please contact BLOODFANG staff.", ephemeral=True
+        )
+        log.error("SHOP_API_KEY is missing from the bot service variables")
+        return
+
+    await interaction.response.defer(ephemeral=True, thinking=True)
+    try:
+        timeout = aiohttp.ClientTimeout(total=12)
+        async with aiohttp.ClientSession(timeout=timeout) as client:
+            async with client.get(
+                f"{api_url}/api/discord/membership/{interaction.user.id}",
+                headers={"X-Shop-API-Key": api_key},
+            ) as response:
+                if response.status == 404:
+                    await interaction.followup.send(
+                        "I couldn't find any membership purchases linked to your Discord account. "
+                        "If you recently purchased one, please wait a moment or contact staff.", ephemeral=True
+                    )
+                    return
+                if response.status != 200:
+                    log.warning("Membership API returned HTTP %s", response.status)
+                    await interaction.followup.send(
+                        "I couldn't check your membership right now. Please try again later.", ephemeral=True
+                    )
+                    return
+                data = await response.json()
+
+        purchases = data.get("memberships", [])
+        if not purchases:
+            await interaction.followup.send(
+                "You don't have any membership records yet. Purchases made before shop records were enabled may not appear.", ephemeral=True
+            )
+            return
+
+        embed = discord.Embed(
+            title="🩸 Your BLOODFANG Membership",
+            color=discord.Color.dark_red(),
+            description=f"Membership records for {interaction.user.mention}",
+        )
+        labels = {
+            "active": "🟢 Active",
+            "pending": "🟡 Pending payment confirmation",
+            "expired": "⚫ Expired",
+            "cancelled": "⚪ Cancelled",
+            "suspended": "🟠 Suspended",
+        }
+        for purchase in purchases[:10]:
+            status = str(purchase.get("status", "unknown")).lower()
+            expiry = purchase.get("expires_at")
+            expiry_text = f"<t:{int(expiry)}:F> (<t:{int(expiry)}:R>)" if expiry else "Not recorded"
+            purchase_type = str(purchase.get("purchase_type", "unknown")).replace("_", " ").title()
+            embed.add_field(
+                name=f"{purchase.get('tier_name', 'Membership')} — {labels.get(status, status.title())}",
+                value=f"**Type:** {purchase_type}\n**Expires:** {expiry_text}",
+                inline=False,
+            )
+        embed.set_footer(text="If these details look wrong, contact BLOODFANG staff.")
+        await interaction.followup.send(embed=embed, ephemeral=True)
+    except (aiohttp.ClientError, asyncio.TimeoutError, ValueError):
+        log.exception("Membership lookup failed for Discord user %s", interaction.user.id)
+        await interaction.followup.send(
+            "The membership service is temporarily unavailable. Please try again later.", ephemeral=True
+        )
 
 
 @bot.tree.command(name="shoplog", description="Create the BLOODFANG purchase log in this channel")
