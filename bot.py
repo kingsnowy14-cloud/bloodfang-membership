@@ -110,7 +110,7 @@ async def balance(ctx, member: discord.Member = None):
     member = member or ctx.author
     amount = get_balance(member.id)
     embed = discord.Embed(title="🏦 Balance",
-        description=f"**Player:** {member.mention}\\n**Balance:** **{amount:,} Coins**".replace(",", "."),
+        description=f"**Player:** {member.mention}\n**Balance:** **{amount:,} Coins**".replace(",", "."),
         color=discord.Color.gold())
     embed.set_thumbnail(url=member.display_avatar.url)
     await ctx.send(embed=embed)
