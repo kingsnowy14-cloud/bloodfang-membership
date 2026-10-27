@@ -113,7 +113,7 @@ def checkout(tier_name):
 
     if request.method == "GET":
         session["checkout_csrf"] = secrets.token_urlsafe(24)
-        return render_template("checkout.html", tier=tier, user=user,
+        return render_template("message.html", title="Membership checkout", tier=tier, user=user,
                                test_mode=ENABLE_TEST_PURCHASES,
                                csrf_token=session["checkout_csrf"])
 
