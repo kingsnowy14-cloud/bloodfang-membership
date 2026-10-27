@@ -12,6 +12,9 @@ DISCORD_CLIENT_ID = os.environ.get("DISCORD_CLIENT_ID", "")
 DISCORD_CLIENT_SECRET = os.environ.get("DISCORD_CLIENT_SECRET", "")
 DISCORD_REDIRECT_URI = os.environ.get("DISCORD_REDIRECT_URI", "")
 PUBLIC_BASE_URL = os.environ.get("PUBLIC_BASE_URL", "").rstrip("/")
+DISCORD_BOT_TOKEN = os.environ.get("DISCORD_BOT_TOKEN", "")
+DISCORD_GUILD_ID = os.environ.get("DISCORD_GUILD_ID", "1561027077984227371")
+ENABLE_TEST_PURCHASES = os.environ.get("ENABLE_TEST_PURCHASES", "false").lower() == "true"
 
 TIERS = [
     {"name":"FANGBORN","emoji":"🩸","price":"2,99","points":"10.000","storage":"4"},
@@ -98,16 +101,70 @@ async def fetch_discord_user(code):
             "global_name": data.get("global_name") or data["username"],
             "avatar": data.get("avatar")}
 
-@app.get("/checkout/<tier_name>")
+@app.route("/checkout/<tier_name>", methods=["GET", "POST"])
 def checkout(tier_name):
-    if not session.get("discord_user"):
+    user = session.get("discord_user")
+    if not user:
         return redirect(url_for("login"))
     tier = next((tier for tier in TIERS if tier["name"].lower().replace(" ", "-") == tier_name), None)
     if not tier:
         return render_template("message.html", title="Rank not found",
                                message="This membership rank does not exist."), 404
-    return render_template("message.html", title="Monthly checkout is not enabled yet",
-                           message=f"You are signed in with Discord. The {tier['name']} subscription costs €{tier['price']} per month. Payments are not enabled yet; you will not be charged."), 503
+
+    if request.method == "GET":
+        session["checkout_csrf"] = secrets.token_urlsafe(24)
+        return render_template("checkout.html", tier=tier, user=user,
+                               test_mode=ENABLE_TEST_PURCHASES,
+                               csrf_token=session["checkout_csrf"])
+
+    submitted_token = request.form.get("csrf_token", "")
+    saved_token = session.pop("checkout_csrf", "")
+    if not submitted_token or not saved_token or not secrets.compare_digest(submitted_token, saved_token):
+        return render_template("message.html", title="Checkout expired",
+                               message="Please return to the membership page and try again."), 400
+
+    if not ENABLE_TEST_PURCHASES:
+        return render_template("message.html", title="Payments are not enabled yet",
+                               message="No payment was taken and no role was changed. Enable test mode in Railway to test role assignment, or configure a real payment provider before accepting purchases."), 503
+    if not DISCORD_BOT_TOKEN or not DISCORD_GUILD_ID:
+        return render_template("message.html", title="Role assignment is not configured",
+                               message="Set DISCORD_BOT_TOKEN and DISCORD_GUILD_ID in Railway first."), 503
+
+    import asyncio
+    try:
+        asyncio.run(assign_membership_role(user["id"], tier["name"]))
+    except RuntimeError as exc:
+        app.logger.warning("Membership test role assignment failed for tier %s: %s", tier["name"], exc)
+        return render_template("message.html", title="Could not assign membership role",
+                               message=str(exc)), 502
+    return render_template("message.html", title="Test membership activated",
+                           message=f"TEST ONLY: {tier['name']} was assigned to your Discord account. No payment was taken.")
+
+
+async def assign_membership_role(user_id, tier_name):
+    headers = {"Authorization": f"Bot {DISCORD_BOT_TOKEN}", "Content-Type": "application/json"}
+    base_url = "https://discord.com/api/v10"
+    timeout = aiohttp.ClientTimeout(total=15)
+    async with aiohttp.ClientSession(timeout=timeout) as client:
+        async with client.get(f"{base_url}/guilds/{DISCORD_GUILD_ID}/roles", headers=headers) as response:
+            if response.status != 200:
+                raise RuntimeError(f"Discord could not list server roles (HTTP {response.status}). Check bot token and server access.")
+            roles = await response.json()
+        role = next((role for role in roles if role.get("name", "").casefold() == tier_name.casefold()), None)
+        if not role:
+            raise RuntimeError(f"The Discord role '{tier_name}' does not exist yet. Create it first or run the role setup command.")
+        async with client.put(
+            f"{base_url}/guilds/{DISCORD_GUILD_ID}/members/{user_id}/roles/{role['id']}",
+            headers=headers,
+            json={},
+        ) as response:
+            if response.status in (200, 204):
+                return
+            if response.status == 404:
+                raise RuntimeError("Your Discord account must already be a member of the BLOODFANG Discord server before the test role can be assigned.")
+            if response.status == 403:
+                raise RuntimeError("The bot needs Manage Roles, and its highest role must be above the membership role.")
+            raise RuntimeError(f"Discord rejected role assignment (HTTP {response.status}).")
 
 @app.get("/logout")
 def logout():
