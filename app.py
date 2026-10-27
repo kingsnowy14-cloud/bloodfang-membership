@@ -133,7 +133,7 @@ def checkout(tier_name):
         try:
             asyncio.run(assign_membership_role(user["id"], tier["name"]))
             save_purchase(user["id"], tier["name"], "test-" + secrets.token_hex(8), purchase_type,
-                          int(time.time()) + 30 * 86400 if purchase_type == "subscription" else None, "test")
+                          int(time.time()) + 30 * 86400 if purchase_type in ("subscription", "one_time") else None, "test")
         except Exception as exc:
             app.logger.exception("Test role assignment failed")
             return render_template("message.html", title="Could not activate test membership", message=str(exc)), 502
@@ -289,7 +289,7 @@ def paypal_return():
             if result:
                 user_id, tier_name, ref = result
                 asyncio.run(assign_membership_role(user_id, tier_name))
-                save_purchase(user_id, tier_name, ref, "one_time", None, "paypal")
+                save_purchase(user_id, tier_name, ref, "one_time", int(time.time()) + 30 * 86400, "paypal")
                 return render_template("message.html", title="Purchase complete",
                                        message=f"Your {tier_name} role has been activated. This was a one-time purchase.")
         return render_template("message.html", title="Subscription pending",
@@ -388,7 +388,7 @@ def expire_memberships():
     now = int(time.time())
     with db_connect() as db:
         rows = db.execute("""SELECT id,user_id,tier_name,provider_ref FROM memberships
-                             WHERE purchase_type='subscription' AND status='active' AND expires_at IS NOT NULL AND expires_at<=?""",
+                             WHERE status='active' AND expires_at IS NOT NULL AND expires_at<=?""",
                           (now,)).fetchall()
     import asyncio
     for row in rows:
