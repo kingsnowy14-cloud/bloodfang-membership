@@ -21,7 +21,7 @@
 <h2>{% if p.purchase_type == 'subscription' %}Monthly subscription{% else %}30-day purchase{% endif %}</h2>
 <div class="membership-meta">
 <span class="status-pill">{% if p.status == 'active' and p.expires_at and p.expires_at > now %}Purchased · Active{% elif p.status == 'pending' %}Payment pending{% elif p.status == 'expired' or (p.expires_at and p.expires_at <= now) %}Expired{% elif p.last_event == 'cancelled_by_member' %}Auto-renewal cancelled{% else %}{{ p.status|title }}{% endif %}</span>
-{% if p.expires_at %}<span>{% if p.expires_at > now %}Access until{% else %}Expired on{% endif %}: {{ p.expires_at|int|datetimeformat if false else (p.expires_at|int) }}</span>{% else %}<span>Permanent access</span>{% endif %}
+{% if p.expires_at %}<span>{% if p.expires_at > now %}Access until{% else %}Expired on{% endif %}: {{ p.expires_label }}</span>{% else %}<span>Permanent access</span>{% endif %}
 <span>Payment: PayPal</span>
 </div>
 {% if p.purchase_type == 'subscription' and p.status == 'active' and p.last_event != 'cancelled_by_member' %}
