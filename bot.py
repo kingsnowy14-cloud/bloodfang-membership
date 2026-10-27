@@ -108,6 +108,30 @@ async def rotate_status():
     log.info("Rotated bot activity to %s", STATUS_ACTIVITIES[_status_index].name)
 
 
+
+@bot.tree.command(name="shoplog", description="Create the BLOODFANG purchase log in this channel")
+@discord.app_commands.default_permissions(manage_guild=True)
+async def shoplog(interaction: discord.Interaction):
+    if not interaction.guild or interaction.guild.id != int(os.environ.get("DISCORD_GUILD_ID", "1561027077984227371")):
+        await interaction.response.send_message("This command can only be used in the configured BLOODFANG server.", ephemeral=True)
+        return
+    if not interaction.user.guild_permissions.manage_guild:
+        await interaction.response.send_message("You need Manage Server permission to configure shop logs.", ephemeral=True)
+        return
+    if not interaction.channel or not interaction.channel.permissions_for(interaction.guild.me).manage_webhooks:
+        await interaction.response.send_message("I need the Manage Webhooks permission in this channel to set up purchase logs.", ephemeral=True)
+        return
+    try:
+        webhook = await interaction.channel.create_webhook(name="BLOODFANG Shop Logs", reason=f"Shop logs configured by {interaction.user}")
+    except discord.Forbidden:
+        await interaction.response.send_message("I cannot create a webhook here. Give me Manage Webhooks permission and try again.", ephemeral=True)
+        return
+    await interaction.response.send_message(
+        "✅ Shop-log webhook created for this channel. One final setup step is required: copy the webhook URL below into the Railway website/membership service as the variable SHOPLOG_WEBHOOK_URL, then redeploy. Treat this URL like a password.\n\n"
+        + f"||{webhook.url}||",
+        ephemeral=True,
+    )
+
 @bot.event
 async def on_ready():
     # Apply the first status immediately, then switch to the other every 2 minutes.
@@ -117,6 +141,14 @@ async def on_ready():
     )
     if not rotate_status.is_running():
         rotate_status.start()
+    try:
+        guild_id = int(os.environ.get("DISCORD_GUILD_ID", "1561027077984227371"))
+        guild = discord.Object(id=guild_id)
+        bot.tree.copy_global_to(guild=guild)
+        synced = await bot.tree.sync(guild=guild)
+        log.info("Synced %s guild slash commands for guild %s", len(synced), guild_id)
+    except Exception:
+        log.exception("Could not sync slash commands")
     log.info("BLOODFANG bot is online as %s (ID: %s)", bot.user, bot.user.id)
 
 
