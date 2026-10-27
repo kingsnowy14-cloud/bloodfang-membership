@@ -30,7 +30,7 @@
 <p>Become part of the BLOODFANG community! Connect your Discord account, explore our membership ranks, or join our Discord server.</p>
 <div class="welcome-actions"><a class="primary" href="/login">Connect Discord <span>↗</span></a><a class="primary discord-join" href="https://discord.gg/fHVxUbWX94" target="_blank" rel="noopener noreferrer">Join Discord <span>↗</span></a></div>
 <div class="hero-mark">BF</div></section>
-<section class="section" id="ranks"><div class="section-head"><div><div class="eyebrow">CHOOSE YOUR RANK</div><h2>Membership Ranks</h2></div><p>Explore our ranks. <strong>Billed monthly.</strong></p></div>
+<section class="section" id="ranks"><div class="sales-stats" aria-label="Purchase statistics"><div class="sales-stats-icon">↗</div><div class="sales-stats-copy"><strong>Purchase statistics</strong><span>Most purchased membership: <b>Not available yet</b></span><span>Most purchased package: <b>Not available yet</b></span><small>Live sales data will appear here once checkout and payment tracking are enabled. No purchases are currently being recorded.</small></div><span class="stats-status">AWAITING SALES DATA</span></div><div class="section-head"><div><div class="eyebrow">CHOOSE YOUR RANK</div><h2>Membership Ranks</h2></div><p>Explore our ranks. <strong>Billed monthly.</strong></p></div>
 <div class="tiers">{% for tier in tiers %}<article class="tier {% if tier.name in ['APEX','BLOOD EMPEROR','BLOOD TITAN','BLOOD GOD'] %}elite{% endif %}">
 <div class="tier-top"><span class="emoji">{{ tier.emoji }}</span><span class="tier-index">{{ "%02d"|format(loop.index) }}</span></div>
 <h3>{{ tier.name }}</h3><div class="price">€{{ tier.price }}<small> / month</small></div>
