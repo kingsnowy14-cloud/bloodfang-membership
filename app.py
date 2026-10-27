@@ -480,7 +480,7 @@ def send_expiry_reminders():
                              AND reminder_sent_at IS NULL AND email IS NOT NULL AND email != ''
                              AND expires_at IS NOT NULL
                              AND expires_at<=? AND expires_at>?""",
-                          (now + 5 * 86400, now + 5 * 86400 - 15 * 60)).fetchall()
+                          (now + 5 * 86400 + 15 * 60, now + 5 * 86400 - 30 * 60)).fetchall()
     for row in rows:
         try:
             send_expiry_email(row["email"], row["tier_name"])
