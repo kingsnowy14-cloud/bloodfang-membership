@@ -30,9 +30,7 @@ STATUS_ACTIVITIES = [
 _status_index = 0
 
 MEMBERSHIPS = [
-    ("FANGBORN", "€2.99", "10,000 Bloodpoints/day", "4 storage"),
     ("STALKER", "€4.99", "25,000 Bloodpoints/day", "5 storage"),
-    ("RAVAGER", "€7.99", "50,000 Bloodpoints/day", "6 storage"),
     ("WARLORD", "€12.99", "100,000 Bloodpoints/day", "8 storage"),
     ("APEX", "€19.99", "200,000 Bloodpoints/day", "9 storage"),
     ("BLOOD EMPEROR", "€29.99", "350,000 Bloodpoints/day", "10 storage"),
