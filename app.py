@@ -254,6 +254,8 @@ async def create_stripe_checkout(user, tier, purchase_type):
     }
     if purchase_type == "subscription":
         form["line_items[0][price_data][recurring][interval]"] = "month"
+        form["subscription_data[metadata][discord_user_id]"] = str(user["id"])
+        form["subscription_data[metadata][tier_name]"] = tier["name"]
     async with aiohttp.ClientSession() as client:
         async with client.post("https://api.stripe.com/v1/checkout/sessions", data=form,
                                auth=aiohttp.BasicAuth(STRIPE_SECRET_KEY, "")) as response:
@@ -459,10 +461,12 @@ def paypal_webhook():
             meta = json.loads(custom)
             user_id, tier_name = str(meta["user_id"]), meta["tier"]
             sub_id = str(resource["id"])
-            expires_at = int(time.time()) + 30 * 86400
-            import asyncio
-            asyncio.run(assign_membership_role(user_id, tier_name))
-            save_purchase(user_id, tier_name, "paypal-sub-" + sub_id, "subscription", expires_at, "paypal")
+            # Activation alone is not proof that the first billing payment succeeded.
+            with db_connect() as db:
+                db.execute("""INSERT INTO memberships(user_id,tier_name,provider,provider_ref,purchase_type,status,expires_at,created_at)
+                              VALUES(?,?, 'paypal', ?, 'subscription','pending',NULL,?)
+                              ON CONFLICT(provider_ref) DO NOTHING""",
+                           (user_id, tier_name, "paypal-sub-" + sub_id, int(time.time())))
         except Exception:
             app.logger.exception("Could not activate PayPal subscription")
             return {"error": "activation failed"}, 500
@@ -486,9 +490,10 @@ def paypal_webhook():
                     return {"error": "activation failed"}, 500
     elif event_type in ("BILLING.SUBSCRIPTION.CANCELLED", "BILLING.SUBSCRIPTION.EXPIRED", "BILLING.SUBSCRIPTION.SUSPENDED"):
         sub_id = str(resource.get("id", ""))
+        # Keep the current paid-through expiry; the expiry worker removes the role then.
         with db_connect() as db:
-            db.execute("UPDATE memberships SET status='cancelled', expires_at=? WHERE provider_ref=?",
-                       (int(time.time()), "paypal-sub-" + sub_id))
+            db.execute("UPDATE memberships SET last_event=? WHERE provider_ref=?",
+                       ("paypal-cancelled", "paypal-sub-" + sub_id))
     return {"received": True}
 
 
