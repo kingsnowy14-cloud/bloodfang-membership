@@ -41,7 +41,8 @@ POINT_PACKAGES = [
 
 @app.get("/")
 def index():
-    return render_template("index.html", tiers=TIERS, points=POINT_PACKAGES, user=session.get("discord_user"))
+    return render_template("index.html", tiers=TIERS, points=POINT_PACKAGES, user=session.get("discord_user"),
+                           paypal_configured=bool(PAYPAL_CLIENT_ID and PAYPAL_CLIENT_SECRET and PAYPAL_WEBHOOK_ID))
 
 @app.get("/points-shop")
 def points_shop():
@@ -52,6 +53,12 @@ def login():
     if not DISCORD_CLIENT_ID or not DISCORD_REDIRECT_URI:
         return render_template("message.html", title="Login is not configured yet",
                                message="Discord OAuth2 variables must be configured in Railway first."), 503
+    next_path = request.args.get("next", "")
+    # Only allow internal checkout paths so login cannot redirect to an external site.
+    if next_path.startswith("/checkout/") and not next_path.startswith("//") and "\\r" not in next_path and "\\n" not in next_path:
+        session["post_login_next"] = next_path
+    else:
+        session.pop("post_login_next", None)
     state = secrets.token_urlsafe(24)
     session["oauth_state"] = state
     params = {
@@ -81,7 +88,8 @@ def callback():
         return render_template("message.html", title="Login failed",
                                message="Could not reach Discord. Please try again later."), 502
     session["discord_user"] = user
-    return redirect(url_for("index"))
+    next_path = session.pop("post_login_next", None)
+    return redirect(next_path if next_path and next_path.startswith("/checkout/") and not next_path.startswith("//") else url_for("index"))
 
 async def fetch_discord_user(code):
     async with aiohttp.ClientSession() as client:
@@ -113,14 +121,19 @@ def checkout(tier_name):
     if not tier:
         return render_template("message.html", title="Rank not found", message="This membership rank does not exist."), 404
     if request.method == "GET":
-        # Until PayPal API credentials are configured, send the visitor directly to PayPal.
-        # This opens PayPal's website only; it cannot create or confirm a BLOODFANG payment.
-        if not (PAYPAL_CLIENT_ID and PAYPAL_CLIENT_SECRET):
-            return redirect("https://www.paypal.com/")
+        if not (PAYPAL_CLIENT_ID and PAYPAL_CLIENT_SECRET and PAYPAL_WEBHOOK_ID):
+            return render_template(
+                "message.html",
+                title="Checkout is not ready yet",
+                message="Secure PayPal checkout is not fully configured. No payment has been taken. Please try again later or contact BLOODFANG staff.",
+            ), 503
+        requested_type = request.args.get("purchase_type", "subscription")
+        if requested_type not in ("subscription", "one_time"):
+            requested_type = "subscription"
         session["checkout_csrf"] = secrets.token_urlsafe(24)
         return render_template("message.html", title="Membership checkout", tier=tier, user=user,
                                test_mode=ENABLE_TEST_PURCHASES, csrf_token=session["checkout_csrf"],
-                               payment_mode=True, purchase_type=request.args.get("purchase_type", "subscription"), paypal_enabled=True)
+                               payment_mode=True, purchase_type=requested_type, paypal_enabled=True)
     submitted_token = request.form.get("csrf_token", "")
     saved_token = session.pop("checkout_csrf", "")
     if not submitted_token or not saved_token or not secrets.compare_digest(submitted_token, saved_token):
