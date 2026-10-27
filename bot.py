@@ -23,6 +23,42 @@ intents = discord.Intents.default()
 intents.message_content = True
 bot = commands.Bot(command_prefix=[".", "!"], intents=intents, status=discord.Status.online, help_command=None)
 
+@bot.command(name="help", aliases=["hilfe", "commands", "befehle"])
+async def help_command(ctx):
+    """Show all available BLOODFANG bot commands."""
+    embed = discord.Embed(
+        title="🩸 BLOODFANG Bot — Hilfe",
+        description="Hier findest du alle verfügbaren Befehle. Prefixe: `!` oder `.`",
+        color=discord.Color.dark_red(),
+    )
+    embed.add_field(
+        name="💰 Economy",
+        value=(
+            "`!balance` / `!bal` / `!konto` [@User] — Kontostand anzeigen\n"
+            "`!work` / `!w` — Coins verdienen (3 Stunden Cooldown)\n"
+            "`!crime` / `!c` — Verbrechen versuchen (3 Stunden Cooldown)\n"
+            "`!cheat` — Coins gewinnen oder verlieren (3 Stunden Cooldown)\n"
+            "`!pay` / `!transfer` @User Betrag — Coins überweisen"
+        ),
+        inline=False,
+    )
+    embed.add_field(
+        name="🩸 Shop & Mitgliedschaft",
+        value=(
+            "`!membership` — Mitgliedschafts-Ränge und Preise per DM\n"
+            "`!pointshop` — Points-Pakete und Preise per DM\n"
+            "`/mymembership` — Eigene Mitgliedschaft prüfen"
+        ),
+        inline=False,
+    )
+    embed.add_field(
+        name="🛠️ Administration",
+        value="`/shoplog` — Shop-Log-Webhook einrichten (Berechtigung: Server verwalten)",
+        inline=False,
+    )
+    embed.set_footer(text="Bei Fragen oder Problemen wende dich an das BLOODFANG-Team.")
+    await ctx.send(embed=embed)
+
 STATUS_ACTIVITIES = [
     discord.Game(name="!membership"),
     discord.Game(name="!pointshop"),
