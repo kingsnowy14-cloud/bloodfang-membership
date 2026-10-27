@@ -21,12 +21,12 @@
 <div class="tier-top"><span class="emoji">{{ tier.emoji }}</span><span class="tier-index">{{ "%02d"|format(loop.index) }}</span></div>
 <h3>{{ tier.name }}</h3><div class="price">€{{ tier.price }}<small> / month</small></div>
 <div class="benefits"><div><span>Bloodpoints / day</span><strong>{{ tier.points }}</strong></div><div><span>Storage slots</span><strong>{{ tier.storage }}</strong></div><div><span>Discord role</span><strong>Included</strong></div>
-{% if tier.name in ['APEX','BLOOD EMPEROR','BLOOD TITAN','BLOOD GOD'] %}<div><span>Rang-Icon</span><strong>Planned</strong></div>{% endif %}
+{% if tier.name in ['APEX','BLOOD EMPEROR','BLOOD TITAN','BLOOD GOD'] %}<div><span>Rank icon</span><strong>Planned</strong></div>{% endif %}
 {% if tier.name in ['BLOOD TITAN','BLOOD GOD'] %}<div><span>Priority Support</span><strong>Included</strong></div>{% endif %}</div>
-{% if user %}<a class="tier-button" href="/checkout/{{ tier.name|lower|replace(' ', '-') }}">Subscribe monthly <span>↗</span></a>{% else %}<a class="tier-button" href="/login">Sign in with Discord, um zu kaufen <span>↗</span></a>{% endif %}
+{% if user %}<a class="tier-button" href="/checkout/{{ tier.name|lower|replace(' ', '-') }}">Subscribe monthly <span>↗</span></a>{% else %}<a class="tier-button" href="/login">Sign in with Discord to purchase <span>↗</span></a>{% endif %}
 </article>{% endfor %}</div>
-<p class="disclaimer"><strong>Monthly membership:</strong> All displayed prices are per month. Payments are not enabled yet, and no money will be charged.</p><p class="disclaimer">Hinweis: Bloodpoints, Storage slots und weitere spielbezogene Vorteile werden erst aktiviert, wenn sie technisch auf dem Evrima-Server unterstützt und eingerichtet sind. Mitgliedschafts-Zahlungen sind derzeit noch nicht aktiviert.</p>
+<p class="disclaimer"><strong>Monthly membership:</strong> All displayed prices are per month. Payments are not enabled yet, and no money will be charged.</p><p class="disclaimer">Note: Bloodpoints, storage slots, and other in-game benefits will only be activated once technically supported and configured on the Evrima server. Membership payments are not enabled yet.</p>
 </section>
 <section class="cta"><div class="eyebrow">YOUR RANK. YOUR RULES.</div><h2>Ready to hunt?</h2><p>Sign in with Discord to manage your membership status when that feature becomes available.</p><a class="primary" href="/login">Connect Discord <span>↗</span></a></section>
-</main><footer><a class="brand" href="/">BLOOD<span>FANG</span></a><span>Fan community · The Isle: Evrima</span><span>Membership portal · Monthly subscriptions</span></footer>
+</main><footer><a class="brand" href="/">BLOOD<span>FANG</span></a><span>Fan community · The Isle: Evrima</span><span>Membership portal · Monthly subscriptions</span><nav class="legal-links"><a href="/imprint">Legal Notice</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="/withdrawal">Withdrawal & Cancellation</a></nav></footer>
 </body></html>
