@@ -1,1 +1,63 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{{ title }} | BLOODFANG</title><link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}"></head><body><main class="message"><a class="brand" href="/">BLOOD<span>FANG</span></a>{% if tier is defined %}<div class="eyebrow">MEMBERSHIP CHECKOUT</div><h1>{{ tier.name }}</h1><p>Choose monthly billing or a one-time payment. Both options grant access for the paid period.</p><form method="post" target="_blank" rel="noopener"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><label for="purchase_type">Purchase type</label><select id="purchase_type" name="purchase_type" required><option value="subscription" {% if purchase_type != "one_time" %}selected{% endif %}>Monthly subscription — €{{ tier.price }} every month</option><option value="one_time" {% if purchase_type == "one_time" %}selected{% endif %}>One-time payment — access for 30 days</option></select><label for="provider">Payment provider</label><select id="provider" name="provider" required>{% if paypal_enabled %}<option value="paypal">PayPal</option>{% endif %}</select>{% if test_mode %}<label><input type="checkbox" name="test_purchase" value="yes"> Test only: assign role without charging</label>{% endif %}<button class="primary" type="submit">Continue to secure checkout</button></form><p><small>Subscriptions require a successful payment each billing period. Access is removed when paid access expires without renewal. One-time purchases provide access for 30 days and do not renew automatically.</small></p>{% else %}<h1>{{ title }}</h1><p>{{ message }}</p>{% endif %}<p><a class="primary" href="/">Back to home</a></p></main></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0c0b0d">
+  <title>{{ title }} | BLOODFANG</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <main class="message checkout-panel">
+    <a class="brand" href="/">BLOOD<span>FANG</span></a>
+
+    {% if tier is defined %}
+      <div class="eyebrow checkout-eyebrow">SECURE MEMBERSHIP CHECKOUT</div>
+      <h1>{{ tier.emoji }} {{ tier.name }}</h1>
+      <p class="checkout-intro">Review your membership and billing choice before continuing to PayPal.</p>
+
+      <div class="checkout-summary">
+        <div><span>Membership rank</span><strong>{{ tier.name }}</strong></div>
+        <div><span>Listed price</span><strong>€{{ tier.price }}</strong></div>
+        <div><span>Discord account</span><strong>{{ user.global_name }}</strong></div>
+      </div>
+
+      <form class="checkout-form" method="post">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+        <label for="purchase_type">Billing option</label>
+        <select id="purchase_type" name="purchase_type" required>
+          <option value="subscription" {% if purchase_type != "one_time" %}selected{% endif %}>Monthly subscription — €{{ tier.price }} each month</option>
+          <option value="one_time" {% if purchase_type == "one_time" %}selected{% endif %}>One-time payment — 30 days of access</option>
+        </select>
+
+        <label for="provider">Payment method</label>
+        <select id="provider" name="provider" required>
+          {% if paypal_enabled %}<option value="paypal">PayPal</option>{% endif %}
+        </select>
+
+        {% if test_mode %}
+          <label class="test-option"><input type="checkbox" name="test_purchase" value="yes"> Test only: assign the Discord role without charging</label>
+        {% endif %}
+
+        <button class="primary checkout-submit" type="submit">Continue to PayPal <span>↗</span></button>
+      </form>
+
+      <div class="checkout-notice">
+        <strong>Before you continue</strong>
+        <p>Monthly subscriptions renew automatically until cancelled. One-time purchases do not renew and provide 30 days of access. Any in-game benefits depend on the server integration being configured.</p>
+      </div>
+    {% else %}
+      <div class="eyebrow checkout-eyebrow">BLOODFANG ACCOUNT</div>
+      <h1>{{ title }}</h1>
+      <p>{{ message }}</p>
+    {% endif %}
+
+    <div class="message-actions">
+      <a class="secondary-action" href="/">← Back to home</a>
+      {% if user is defined and user %}<a class="secondary-action" href="/my-memberships">My Memberships</a>{% endif %}
+      <a class="secondary-action" href="/points-shop">Points Shop</a>
+    </div>
+  </main>
+</body>
+</html>
