@@ -22,7 +22,7 @@
   </div>
 </div>
 <header class="topbar"><a class="brand" href="/">BLOOD<span>FANG</span></a><nav><a class="navbtn" href="#ranks">Membership</a><a class="navbtn" href="/points-shop">BLOODFANG Points Shop</a>
-{% if user %}<span class="user">Signed in as {{ user.global_name }}</span><a class="navbtn" href="/logout">Sign out</a>
+{% if user %}<span class="user">Signed in as {{ user.global_name }}</span><a class="navbtn" href="/my-memberships">My Memberships</a><a class="navbtn" href="/logout">Sign out</a>
 {% else %}<a class="navbtn" href="/login">Connect Discord</a>{% endif %}
 </nav></header>
 <main>
