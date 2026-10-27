@@ -122,15 +122,80 @@ async def shoplog(interaction: discord.Interaction):
         await interaction.response.send_message("I need the Manage Webhooks permission in this channel to set up purchase logs.", ephemeral=True)
         return
     try:
-        webhook = await interaction.channel.create_webhook(name="BLOODFANG Shop Logs", reason=f"Shop logs configured by {interaction.user}")
+        hooks = await interaction.channel.webhooks()
+        webhook = next((hook for hook in hooks if hook.name == "BLOODFANG Shop Logs" and hook.user == bot.user), None)
+        if webhook is None:
+            webhook = await interaction.channel.create_webhook(name="BLOODFANG Shop Logs", reason=f"Shop logs configured by {interaction.user}")
     except discord.Forbidden:
-        await interaction.response.send_message("I cannot create a webhook here. Give me Manage Webhooks permission and try again.", ephemeral=True)
+        await interaction.response.send_message("I cannot manage webhooks here. Give me Manage Webhooks permission and try again.", ephemeral=True)
         return
     await interaction.response.send_message(
         "✅ Shop-log webhook created for this channel. One final setup step is required: copy the webhook URL below into the Railway website/membership service as the variable SHOPLOG_WEBHOOK_URL, then redeploy. Treat this URL like a password.\n\n"
         + f"||{webhook.url}||",
         ephemeral=True,
     )
+
+
+@bot.tree.command(name="membership", description="Show all BLOODFANG membership ranks")
+async def membership_slash(interaction: discord.Interaction):
+    embed = discord.Embed(
+        title="🩸 BLOODFANG Membership Ranks",
+        description="Choose a rank on the membership website. Monthly plans renew automatically; one-time purchases grant 30 days of access.",
+        color=discord.Color.dark_red(),
+        url=os.environ.get("PUBLIC_BASE_URL", "https://bloodfang-membership.up.railway.app").rstrip("/") + "/#ranks",
+    )
+    for name, price, points, storage in MEMBERSHIPS:
+        embed.add_field(name=f"{name} · {price}/month", value=f"{points}\n{storage}\nDiscord rank included", inline=False)
+    embed.set_footer(text="In-game benefits depend on server integration and configuration.")
+    await interaction.response.send_message(embed=embed, ephemeral=True)
+
+
+@bot.tree.command(name="pointshop", description="Show BLOODFANG points packages")
+async def pointshop_slash(interaction: discord.Interaction):
+    embed = discord.Embed(
+        title="💎 BLOODFANG Points Shop",
+        description="These packages are currently previews only. Point-pack checkout and automatic point delivery are not enabled yet.",
+        color=discord.Color.dark_red(),
+        url=os.environ.get("PUBLIC_BASE_URL", "https://bloodfang-membership.up.railway.app").rstrip("/") + "/points-shop",
+    )
+    for points, price in POINT_PACKAGES:
+        embed.add_field(name=f"{points} points · {price}", value="One-time package · **Purchase not available yet**", inline=False)
+    embed.set_footer(text="No payment will be taken for points packages at this time.")
+    await interaction.response.send_message(embed=embed, ephemeral=True)
+
+
+@bot.tree.command(name="shopinfo", description="Get the official BLOODFANG shop and Discord links")
+async def shopinfo(interaction: discord.Interaction):
+    base_url = os.environ.get("PUBLIC_BASE_URL", "https://bloodfang-membership.up.railway.app").rstrip("/")
+    embed = discord.Embed(title="🩸 BLOODFANG Shop", description="Official community shop links.", color=discord.Color.dark_red())
+    embed.add_field(name="Memberships", value=f"{base_url}/#ranks", inline=False)
+    embed.add_field(name="Points Shop", value=f"{base_url}/points-shop", inline=False)
+    embed.add_field(name="My Memberships", value=f"{base_url}/my-memberships", inline=False)
+    embed.add_field(name="Discord Community", value="https://discord.gg/fHVxUbWX94", inline=False)
+    await interaction.response.send_message(embed=embed, ephemeral=True)
+
+
+@bot.tree.command(name="shophelp", description="List BLOODFANG shop commands")
+async def shophelp(interaction: discord.Interaction):
+    embed = discord.Embed(title="🩸 BLOODFANG Shop Commands", color=discord.Color.dark_red())
+    embed.add_field(name="/membership", value="List membership ranks, prices and listed benefits.", inline=False)
+    embed.add_field(name="/pointshop", value="List points packages and clearly show their availability.", inline=False)
+    embed.add_field(name="/shopinfo", value="Show website and community links.", inline=False)
+    embed.add_field(name="/shopstatus", value="Show bot status and current feature availability.", inline=False)
+    embed.add_field(name="/shoplog", value="Configure the purchase-log channel (Manage Server permission required).", inline=False)
+    embed.set_footer(text="Legacy text commands !membership and !pointshop still work.")
+    await interaction.response.send_message(embed=embed, ephemeral=True)
+
+
+@bot.tree.command(name="shopstatus", description="Show the bot status and shop feature availability")
+async def shopstatus(interaction: discord.Interaction):
+    embed = discord.Embed(title="🩸 BLOODFANG Shop Status", color=discord.Color.dark_red())
+    embed.add_field(name="Discord bot", value="Online and responding", inline=True)
+    embed.add_field(name="Membership offers", value=f"{len(MEMBERSHIPS)} ranks listed", inline=True)
+    embed.add_field(name="Points checkout", value="Not enabled yet", inline=True)
+    embed.add_field(name="Purchase logs", value="Requires /shoplog plus SHOPLOG_WEBHOOK_URL on the Railway website service", inline=False)
+    embed.add_field(name="PayPal", value="Checkout availability depends on PayPal credentials, plan IDs and webhook configuration in Railway.", inline=False)
+    await interaction.response.send_message(embed=embed, ephemeral=True)
 
 @bot.event
 async def on_ready():
