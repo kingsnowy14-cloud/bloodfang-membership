@@ -101,6 +101,22 @@ def logout():
     session.clear()
     return redirect(url_for("index"))
 
+@app.get("/imprint")
+def imprint():
+    return render_template("legal.html", page="imprint", title="Legal Notice")
+
+@app.get("/privacy")
+def privacy():
+    return render_template("legal.html", page="privacy", title="Privacy Policy")
+
+@app.get("/terms")
+def terms():
+    return render_template("legal.html", page="terms", title="Terms of Service")
+
+@app.get("/withdrawal")
+def withdrawal():
+    return render_template("legal.html", page="withdrawal", title="Withdrawal & Cancellation")
+
 @app.get("/health")
 def health():
     return {"status": "ok", "payments": "not_configured"}
