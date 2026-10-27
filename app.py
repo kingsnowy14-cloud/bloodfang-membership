@@ -113,7 +113,7 @@ def checkout(tier_name):
         session["checkout_csrf"] = secrets.token_urlsafe(24)
         return render_template("message.html", title="Membership checkout", tier=tier, user=user,
                                test_mode=ENABLE_TEST_PURCHASES, csrf_token=session["checkout_csrf"],
-                               payment_mode=True, paypal_enabled=bool(PAYPAL_CLIENT_ID and PAYPAL_CLIENT_SECRET))
+                               payment_mode=True, purchase_type=request.args.get("purchase_type", "subscription"), paypal_enabled=bool(PAYPAL_CLIENT_ID and PAYPAL_CLIENT_SECRET))
     submitted_token = request.form.get("csrf_token", "")
     saved_token = session.pop("checkout_csrf", "")
     if not submitted_token or not saved_token or not secrets.compare_digest(submitted_token, saved_token):
@@ -383,6 +383,43 @@ def paypal_webhook():
                        ("paypal-cancelled", "paypal-sub-" + sub_id))
     return {"received": True}
 
+
+@app.get("/my-memberships")
+def my_memberships():
+    user = session.get("discord_user")
+    if not user:
+        return redirect(url_for("login"))
+    with db_connect() as db:
+        purchases = db.execute("SELECT id,tier_name,purchase_type,status,expires_at,provider,provider_ref,last_event FROM memberships WHERE user_id=? ORDER BY created_at DESC", (str(user["id"]),)).fetchall()
+    return render_template("memberships.html", purchases=purchases, now=int(time.time()), user=user)
+
+@app.post("/cancel-membership/<int:purchase_id>")
+def cancel_membership(purchase_id):
+    user = session.get("discord_user")
+    if not user:
+        return redirect(url_for("login"))
+    with db_connect() as db:
+        purchase = db.execute("SELECT * FROM memberships WHERE id=? AND user_id=? AND purchase_type='subscription' AND provider='paypal' AND status='active'", (purchase_id, str(user["id"]))).fetchone()
+    if not purchase:
+        return render_template("message.html", title="Membership not found", message="This active PayPal subscription could not be found."), 404
+    import asyncio
+    try:
+        async def cancel_paypal_subscription():
+            async with aiohttp.ClientSession() as client:
+                token = await paypal_access_token(client)
+                headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+                subscription_id = purchase["provider_ref"].removeprefix("paypal-sub-")
+                async with client.post(f"{PAYPAL_API}/v1/billing/subscriptions/{subscription_id}/cancel", headers=headers, json={"reason": "Cancelled by BLOODFANG member"}) as response:
+                    if response.status not in (200, 204):
+                        detail = await response.text()
+                        raise RuntimeError(f"PayPal cancellation failed (HTTP {response.status}): {detail[:300]}")
+        asyncio.run(cancel_paypal_subscription())
+        with db_connect() as db:
+            db.execute("UPDATE memberships SET last_event='cancelled_by_member' WHERE id=?", (purchase_id,))
+        return render_template("message.html", title="Subscription cancelled", message="Your PayPal subscription has been cancelled. Your membership role remains active until the end of the paid period, then it will be removed automatically.")
+    except Exception:
+        app.logger.exception("PayPal subscription cancellation failed")
+        return render_template("message.html", title="Cancellation failed", message="We could not cancel this subscription with PayPal. Please cancel it directly in your PayPal account and try again."), 502
 
 def expire_memberships():
     now = int(time.time())
