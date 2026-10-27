@@ -31,8 +31,8 @@ def index():
 @app.get("/login")
 def login():
     if not DISCORD_CLIENT_ID or not DISCORD_REDIRECT_URI:
-        return render_template("message.html", title="Login noch nicht konfiguriert",
-                               message="Discord OAuth2 Variablen müssen zuerst in Railway gesetzt werden."), 503
+        return render_template("message.html", title="Login is not configured yet",
+                               message="Discord OAuth2 variables must be configured in Railway first."), 503
     state = secrets.token_urlsafe(24)
     session["oauth_state"] = state
     params = {
@@ -49,18 +49,18 @@ def callback():
     code = request.args.get("code")
     state = request.args.get("state")
     if not code or not state or not secrets.compare_digest(state, session.pop("oauth_state", "")):
-        return render_template("message.html", title="Login fehlgeschlagen",
-                               message="Die Discord-Anmeldung war ungültig oder ist abgelaufen."), 400
+        return render_template("message.html", title="Login failed",
+                               message="The Discord sign-in was invalid or has expired."), 400
     if not DISCORD_CLIENT_ID or not DISCORD_CLIENT_SECRET or not DISCORD_REDIRECT_URI:
-        return render_template("message.html", title="Login nicht konfiguriert",
-                               message="Bitte Discord OAuth2 Variablen in Railway prüfen."), 503
+        return render_template("message.html", title="Login is not configured",
+                               message="Please check the Discord OAuth2 variables in Railway."), 503
     try:
         import asyncio
         user = asyncio.run(fetch_discord_user(code))
     except Exception:
         app.logger.exception("Discord OAuth callback failed")
-        return render_template("message.html", title="Login fehlgeschlagen",
-                               message="Discord konnte nicht erreicht werden. Bitte später erneut versuchen."), 502
+        return render_template("message.html", title="Login failed",
+                               message="Could not reach Discord. Please try again later."), 502
     session["discord_user"] = user
     return redirect(url_for("index"))
 
@@ -91,10 +91,10 @@ def checkout(tier_name):
         return redirect(url_for("login"))
     tier = next((tier for tier in TIERS if tier["name"].lower().replace(" ", "-") == tier_name), None)
     if not tier:
-        return render_template("message.html", title="Rang nicht gefunden",
-                               message="Dieser Membership-Rang existiert nicht."), 404
-    return render_template("message.html", title="Monatlicher Kauf noch nicht aktiviert",
-                           message=f"Du bist mit Discord angemeldet. Das Abo für {tier['name']} kostet €{tier['price']} pro Monat. Die Zahlung ist noch nicht aktiviert; es wird nichts abgebucht."), 503
+        return render_template("message.html", title="Rank not found",
+                               message="This membership rank does not exist."), 404
+    return render_template("message.html", title="Monthly checkout is not enabled yet",
+                           message=f"You are signed in with Discord. The {tier['name']} subscription costs €{tier['price']} per month. Payments are not enabled yet; you will not be charged."), 503
 
 @app.get("/logout")
 def logout():
