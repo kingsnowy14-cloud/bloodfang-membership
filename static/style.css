@@ -5,3 +5,19 @@
 .points-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}.point-card{border:1px solid var(--line);background:linear-gradient(160deg,#191619,#100e10);padding:25px 22px;min-width:0}.point-card.point-featured{border-color:var(--red);background:linear-gradient(155deg,#2a1118,#110e10 75%)}.point-card h3{font:800 clamp(25px,3vw,38px)/1.1 'Barlow Condensed',sans-serif;margin:22px 0 8px;overflow-wrap:anywhere}.point-card p{font-size:12px;color:var(--muted)}.point-price{font-size:30px;font-weight:800;margin:20px 0 12px}.point-note{font-size:10px;letter-spacing:.8px;text-transform:uppercase;color:#ed8c98;margin-bottom:20px}.point-card .tier-button{width:100%;font-family:inherit;background:transparent;cursor:not-allowed;opacity:.72}.point-card button:disabled{color:#b9aeb2}@media(max-width:900px){.points-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:560px){.points-grid{grid-template-columns:1fr}.topbar nav{gap:8px}.navbtn{padding:9px 10px;font-size:10px}}
 
 .welcome-actions{display:flex;flex-wrap:wrap;gap:12px;align-items:center}.discord-join{background:transparent;border:1px solid #7b3541}.discord-join:hover{background:#2c1419;border-color:var(--red)}@media(max-width:560px){.welcome-actions{align-items:stretch;flex-direction:column;max-width:300px}.topbar nav{gap:6px}.navbtn{padding:8px;font-size:9px}}
+
+/* Full-screen welcome gate: the site stays locked until the visitor enters. */
+html:has(body.welcome-locked), body.welcome-locked{overflow:hidden;height:100%;overscroll-behavior:none}
+body.welcome-locked{touch-action:none}
+.welcome-gate{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;overflow-y:auto;padding:30px 22px;background:radial-gradient(ellipse at 75% 42%,#3a111b 0,transparent 38%),linear-gradient(125deg,#111013 0%,#0c0b0d 68%);transition:opacity .4s ease,visibility .4s ease}
+.welcome-gate:before{content:"";position:absolute;inset:18px;border:1px solid #382229;pointer-events:none}
+.welcome-gate-content{position:relative;width:min(760px,100%);padding:38px 0;text-align:center}
+.gate-mark{font:900 clamp(100px,19vw,190px)/.85 'Barlow Condensed',sans-serif;color:#ffffff08;letter-spacing:-8px;margin:24px 0 -4px;pointer-events:none}
+.welcome-gate h1{font:900 clamp(58px,10vw,112px)/.88 'Barlow Condensed',sans-serif;letter-spacing:1px;margin:18px 0 24px}
+.welcome-gate h1 span{color:var(--red)}
+.welcome-gate p{max-width:550px;margin:0 auto 28px;color:#c0b5b8;line-height:1.8;font-size:14px}
+.gate-actions{justify-content:center}
+.enter-site{font-family:inherit;border:0;cursor:pointer}
+.gate-foot{margin-top:36px;color:#796b70;font-size:10px;font-weight:700;letter-spacing:4px}
+.welcome-gate-hidden{opacity:0;visibility:hidden;pointer-events:none}
+@media(max-width:560px){.welcome-gate:before{inset:9px}.welcome-gate-content{padding:24px 0}.welcome-gate h1{font-size:clamp(54px,15vw,78px)}.gate-actions{max-width:320px;margin:0 auto;flex-direction:column;align-items:stretch}.gate-actions .primary{justify-content:space-between}.gate-foot{letter-spacing:2px}}
