@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0c0b0d">
+  <title>BLOODFANG | Points Shop</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<header class="topbar"><a class="brand" href="/">BLOOD<span>FANG</span></a><nav><a class="navbtn" href="/">Home</a><a class="navbtn" href="/#ranks">Membership</a>
+{% if user %}<span class="user">Signed in as {{ user.global_name }}</span><a class="navbtn" href="/logout">Sign out</a>
+{% else %}<a class="navbtn" href="/login">Sign in with Discord</a>{% endif %}
+</nav></header>
+<main>
+<section class="hero points-hero"><div class="eyebrow">THE ISLE: EVRIMA · ONE-TIME PURCHASES</div><h1>BLOODPOINTS<br><span>SHOP.</span></h1>
+<p>Choose your BLOODFANG points package. Every offer on this page is a one-time purchase, not a monthly membership subscription.</p>
+<a class="primary" href="#points-packages">Explore packages <span>↓</span></a><div class="hero-mark">BF</div></section>
+<section class="section points-section" id="points-packages"><div class="section-head"><div><div class="eyebrow">ONE-TIME PURCHASES</div><h2>Choose a package</h2></div><p>Pick the amount that suits your hunt. Prices shown are per package.</p></div>
+<div class="points-grid">{% for pack in points %}<article class="point-card {% if pack.featured %}point-featured{% endif %}"><div class="eyebrow">BLOODFANG POINTS</div><h3>{{ pack.points }}</h3><p>Points package · one-time purchase</p><div class="point-price">$ {{ pack.price }}</div><div class="point-note">Payment setup coming later</div>{% if user %}<button class="tier-button" type="button" disabled>Purchase unavailable <span>⌛</span></button>{% else %}<a class="tier-button" href="/login">Connect Discord <span>↗</span></a>{% endif %}</article>{% endfor %}</div>
+<p class="disclaimer"><strong>Important:</strong> These offers are currently displayed for preview only. Checkout, PayPal and other payment methods are not connected. No payment will be taken and points are not credited by this website yet.</p>
+</section>
+<section class="cta"><div class="eyebrow">YOUR RANK. YOUR RULES.</div><h2>Want more than points?</h2><p>Explore the separate BLOODFANG membership ranks and their proposed benefits.</p><a class="primary" href="/#ranks">View memberships <span>↗</span></a></section>
+</main><footer><a class="brand" href="/">BLOOD<span>FANG</span></a><span>Fan community · The Isle: Evrima</span><span>Points shop · payments not active</span><nav class="legal-links"><a href="/imprint">Legal Notice</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="/withdrawal">Withdrawal & Cancellation</a></nav></footer>
+</body></html>
