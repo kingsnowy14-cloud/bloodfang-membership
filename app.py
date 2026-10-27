@@ -435,6 +435,27 @@ def paypal_webhook():
     return {"received": True}
 
 
+
+@app.get("/api/discord/membership/<user_id>")
+def discord_membership_lookup(user_id):
+    # Private bot-to-website endpoint; never expose membership records without the shared secret.
+    expected_key = os.environ.get("SHOP_API_KEY", "").strip()
+    supplied_key = request.headers.get("X-Shop-API-Key", "")
+    if not expected_key or not supplied_key or not hmac.compare_digest(supplied_key, expected_key):
+        return {"error": "unauthorized"}, 401
+    if not user_id.isdigit():
+        return {"error": "invalid user id"}, 400
+    with db_connect() as db:
+        rows = db.execute(
+            """SELECT tier_name, purchase_type, status, expires_at, created_at
+               FROM memberships WHERE user_id=?
+               ORDER BY created_at DESC LIMIT 10""",
+            (user_id,),
+        ).fetchall()
+    if not rows:
+        return {"memberships": []}, 200
+    return {"memberships": [dict(row) for row in rows]}, 200
+
 @app.get("/my-memberships")
 def my_memberships():
     user = session.get("discord_user")
