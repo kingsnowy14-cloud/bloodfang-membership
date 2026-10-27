@@ -434,62 +434,60 @@ def cancel_membership(purchase_id):
         app.logger.exception("PayPal subscription cancellation failed")
         return render_template("message.html", title="Cancellation failed", message="We could not cancel this subscription with PayPal. Please cancel it directly in your PayPal account and try again."), 502
 
-def send_expiry_email(recipient_email, tier_name):
-    import smtplib
-    from email.message import EmailMessage
+async def send_expiry_dm(user_id, tier_name):
+    """Send the expiry reminder as a Discord DM using the configured bot."""
+    if not DISCORD_BOT_TOKEN:
+        raise RuntimeError("DISCORD_BOT_TOKEN is not configured.")
 
-    host = os.environ.get("BREVO_SMTP_HOST", "smtp-relay.brevo.com")
-    port = int(os.environ.get("BREVO_SMTP_PORT", "587"))
-    login = os.environ.get("BREVO_SMTP_LOGIN", "")
-    smtp_key = os.environ.get("BREVO_SMTP_KEY", "")
-    from_email = os.environ.get("BREVO_FROM_EMAIL", "")
-    from_name = os.environ.get("BREVO_FROM_NAME", "BLOODFANG")
-    if not all((host, login, smtp_key, from_email)):
-        raise RuntimeError("Email reminders are not configured. Set BREVO_SMTP_LOGIN, BREVO_SMTP_KEY and BREVO_FROM_EMAIL in Railway.")
+    headers = {"Authorization": f"Bot {DISCORD_BOT_TOKEN}", "Content-Type": "application/json"}
+    timeout = aiohttp.ClientTimeout(total=15)
+    async with aiohttp.ClientSession(timeout=timeout) as client:
+        async with client.post(
+            "https://discord.com/api/v10/users/@me/channels",
+            headers=headers,
+            json={"recipient_id": str(user_id)},
+        ) as response:
+            data = await response.json()
+            if response.status not in (200, 201):
+                raise RuntimeError(f"Could not open Discord DM (HTTP {response.status}). The user may have DMs disabled.")
+            channel_id = data["id"]
 
-    message = EmailMessage()
-    message["Subject"] = f"Your BLOODFANG {tier_name} membership expires in 5 days"
-    message["From"] = f"{from_name} <{from_email}>"
-    message["To"] = recipient_email
-    message.set_content(
-        f"""Hello BLOODFANG member,
-
-Your {tier_name} membership will expire in 5 days.
-
-If you enjoyed your membership, we would love to welcome you back. You can purchase your membership again here:
-{PUBLIC_BASE_URL}/#ranks
-
-Thank you for being part of BLOODFANG.
-
-Stay fierce,
-The BLOODFANG Team
-"""
-    )
-    with smtplib.SMTP(host, port, timeout=20) as smtp:
-        smtp.starttls()
-        smtp.login(login, smtp_key)
-        smtp.send_message(message)
+        content = (
+            f"Hello BLOODFANG member! Your **{tier_name}** membership expires in 5 days.\n\n"
+            "If you enjoyed your membership, we'd love to welcome you back! "
+            f"You can purchase it again here: {PUBLIC_BASE_URL}/#ranks\n\n"
+            "Thank you for being part of BLOODFANG.\n"
+            "**Stay fierce, The BLOODFANG Team**"
+        )
+        async with client.post(
+            f"https://discord.com/api/v10/channels/{channel_id}/messages",
+            headers=headers,
+            json={"content": content},
+        ) as response:
+            if response.status not in (200, 201):
+                detail = await response.text()
+                raise RuntimeError(f"Could not send Discord DM (HTTP {response.status}): {detail[:200]}")
 
 
 def send_expiry_reminders():
-    # A 30-day one-time purchase gets an email on day 25 (five days before expiry).
+    # One-time memberships expire after 30 days; send a DM around day 25.
     now = int(time.time())
     with db_connect() as db:
-        rows = db.execute("""SELECT id,tier_name,email,expires_at FROM memberships
+        rows = db.execute("""SELECT id,user_id,tier_name,expires_at FROM memberships
                              WHERE purchase_type='one_time' AND status='active'
-                             AND reminder_sent_at IS NULL AND email IS NOT NULL AND email != ''
-                             AND expires_at IS NOT NULL
+                             AND reminder_sent_at IS NULL AND expires_at IS NOT NULL
                              AND expires_at<=? AND expires_at>?""",
                           (now + 5 * 86400 + 15 * 60, now + 5 * 86400 - 30 * 60)).fetchall()
+    import asyncio
     for row in rows:
         try:
-            send_expiry_email(row["email"], row["tier_name"])
+            asyncio.run(send_expiry_dm(row["user_id"], row["tier_name"]))
             with db_connect() as db:
                 db.execute("UPDATE memberships SET reminder_sent_at=? WHERE id=? AND reminder_sent_at IS NULL",
                            (now, row["id"]))
-            app.logger.info("Expiry reminder email sent for membership id=%s", row["id"])
+            app.logger.info("Expiry reminder DM sent for membership id=%s", row["id"])
         except Exception:
-            app.logger.exception("Could not send expiry email for membership id=%s", row["id"])
+            app.logger.exception("Could not send expiry DM for membership id=%s", row["id"])
 
 def expire_memberships():
     now = int(time.time())
