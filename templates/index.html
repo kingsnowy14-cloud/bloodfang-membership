@@ -35,7 +35,7 @@
 <div class="tier-top"><span class="emoji">{{ tier.emoji }}</span><span class="tier-index">{{ "%02d"|format(loop.index) }}</span></div>
 <h3>{{ tier.name }}</h3><div class="price">€{{ tier.price }}<small> / month</small></div>
 <label class="purchase-choice-label" for="purchase-{{ loop.index }}">Choose your payment option</label>
-<select class="purchase-choice" id="purchase-{{ loop.index }}" onchange="const button=this.closest('.tier').querySelector('.tier-button'); button.href='/checkout/{{ tier.name|lower|replace(' ', '-') }}?purchase_type='+this.value;">
+<select class="purchase-choice" id="purchase-{{ loop.index }}" data-base="/checkout/{{ tier.name|lower|replace(' ', '-') }}" onchange="this.closest('.tier').querySelector('.tier-button').href=this.dataset.base+'?purchase_type='+this.value;">
 <option value="subscription" selected>Pay monthly — €{{ tier.price }} every month</option>
 <option value="one_time">Pay once — access for 30 days</option>
 </select>
