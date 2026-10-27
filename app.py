@@ -122,6 +122,9 @@ def checkout(tier_name):
     saved_token = session.pop("checkout_csrf", "")
     if not submitted_token or not saved_token or not secrets.compare_digest(submitted_token, saved_token):
         return render_template("message.html", title="Checkout expired", message="Please return and try again."), 400
+    email = request.form.get("email", "").strip()
+    if "@" not in email or "." not in email.rsplit("@", 1)[-1]:
+        return render_template("message.html", title="Valid email required", message="Please enter a valid email address so we can send your membership expiry reminder."), 400
     purchase_type = request.form.get("purchase_type", "subscription")
     provider = request.form.get("provider", "").lower()
     if purchase_type not in ("one_time", "subscription"):
@@ -137,7 +140,7 @@ def checkout(tier_name):
         try:
             asyncio.run(assign_membership_role(user["id"], tier["name"]))
             save_purchase(user["id"], tier["name"], "test-" + secrets.token_hex(8), purchase_type,
-                          int(time.time()) + 30 * 86400 if purchase_type in ("subscription", "one_time") else None, "test")
+                          int(time.time()) + 30 * 86400 if purchase_type in ("subscription", "one_time") else None, "test", email)
         except Exception as exc:
             app.logger.exception("Test role assignment failed")
             return render_template("message.html", title="Could not activate test membership", message=str(exc)), 502
@@ -145,7 +148,7 @@ def checkout(tier_name):
                                message=f"TEST ONLY: {tier['name']} role assigned. No payment was taken.")
     try:
         import asyncio
-        checkout_url = asyncio.run(create_paypal_checkout(user, tier, purchase_type))
+        checkout_url = asyncio.run(create_paypal_checkout(user, tier, purchase_type, email))
     except Exception as exc:
         app.logger.exception("Could not create %s checkout", provider)
         return render_template("message.html", title="Checkout could not be started", message=str(exc)), 502
@@ -204,6 +207,11 @@ PAYPAL_CLIENT_SECRET = os.environ.get("PAYPAL_CLIENT_SECRET", "")
 PAYPAL_WEBHOOK_ID = os.environ.get("PAYPAL_WEBHOOK_ID", "")
 PAYPAL_MODE = os.environ.get("PAYPAL_MODE", "sandbox").lower()
 PAYPAL_API = "https://api-m.paypal.com" if PAYPAL_MODE == "live" else "https://api-m.sandbox.paypal.com"
+SMTP_HOST = os.environ.get("SMTP_HOST", "smtp-relay.brevo.com")
+SMTP_PORT = int(os.environ.get("SMTP_PORT", "587"))
+SMTP_USER = os.environ.get("SMTP_USER", "")
+SMTP_PASSWORD = os.environ.get("SMTP_PASSWORD", "")
+MAIL_FROM = os.environ.get("MAIL_FROM", SMTP_USER)
 
 
 def db_connect():
@@ -219,18 +227,23 @@ def init_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT, user_id TEXT NOT NULL, tier_name TEXT NOT NULL,
             provider TEXT NOT NULL, provider_ref TEXT NOT NULL UNIQUE, purchase_type TEXT NOT NULL,
             status TEXT NOT NULL, expires_at INTEGER, created_at INTEGER NOT NULL,
-            last_event TEXT
+            last_event TEXT, email TEXT, reminder_sent_at INTEGER
         )""")
+        columns = {row["name"] for row in db.execute("PRAGMA table_info(memberships)").fetchall()}
+        if "email" not in columns:
+            db.execute("ALTER TABLE memberships ADD COLUMN email TEXT")
+        if "reminder_sent_at" not in columns:
+            db.execute("ALTER TABLE memberships ADD COLUMN reminder_sent_at INTEGER")
         db.execute("CREATE INDEX IF NOT EXISTS idx_memberships_expiry ON memberships(status, purchase_type, expires_at)")
 
 
-def save_purchase(user_id, tier_name, provider_ref, purchase_type, expires_at, provider):
+def save_purchase(user_id, tier_name, provider_ref, purchase_type, expires_at, provider, email=None):
     now = int(time.time())
     with db_connect() as db:
-        db.execute("""INSERT INTO memberships(user_id,tier_name,provider,provider_ref,purchase_type,status,expires_at,created_at)
-                      VALUES(?,?,?,?,?,'active',?,?) ON CONFLICT(provider_ref) DO UPDATE SET
-                      status='active', expires_at=excluded.expires_at, last_event=NULL""",
-                   (str(user_id), tier_name, provider, str(provider_ref), purchase_type, expires_at, now))
+        db.execute("""INSERT INTO memberships(user_id,tier_name,provider,provider_ref,purchase_type,status,expires_at,created_at,email)
+                      VALUES(?,?,?,?,?,'active',?,?,?) ON CONFLICT(provider_ref) DO UPDATE SET
+                      status='active', expires_at=excluded.expires_at, email=COALESCE(excluded.email,email), last_event=NULL""",
+                   (str(user_id), tier_name, provider, str(provider_ref), purchase_type, expires_at, now, email))
 
 
 async def paypal_access_token(client):
@@ -244,11 +257,11 @@ async def paypal_access_token(client):
         return data["access_token"]
 
 
-async def create_paypal_checkout(user, tier, purchase_type):
+async def create_paypal_checkout(user, tier, purchase_type, email):
     async with aiohttp.ClientSession() as client:
         token = await paypal_access_token(client)
         headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
-        custom_id = json.dumps({"user_id": str(user["id"]), "tier": tier["name"], "type": purchase_type})
+        custom_id = json.dumps({"user_id": str(user["id"]), "tier": tier["name"], "type": purchase_type, "email": email})
         if purchase_type == "one_time":
             payload = {"intent": "CAPTURE", "purchase_units": [{
                 "custom_id": custom_id, "description": "BLOODFANG " + tier["name"],
@@ -293,7 +306,7 @@ def paypal_return():
             if result:
                 user_id, tier_name, ref = result
                 asyncio.run(assign_membership_role(user_id, tier_name))
-                save_purchase(user_id, tier_name, ref, "one_time", int(time.time()) + 30 * 86400, "paypal")
+                save_purchase(user_id, tier_name, ref, "one_time", int(time.time()) + 30 * 86400, "paypal", result[3])
                 return render_template("message.html", title="Purchase complete",
                                        message=f"Your {tier_name} role has been activated. This was a one-time purchase.")
         return render_template("message.html", title="Subscription pending",
@@ -316,7 +329,7 @@ async def capture_paypal_order(order_id):
         custom = json.loads(unit.get("payments", {}).get("captures", [{}])[0].get("custom_id") or unit.get("custom_id") or "{}")
         if data.get("status") != "COMPLETED" or not custom.get("user_id") or not custom.get("tier"):
             return None
-        return str(custom["user_id"]), custom["tier"], "paypal-order-" + order_id
+        return str(custom["user_id"]), custom["tier"], "paypal-order-" + order_id, custom.get("email", "")
 
 
 async def verify_paypal_webhook(headers, event):
@@ -428,6 +441,35 @@ def cancel_membership(purchase_id):
         app.logger.exception("PayPal subscription cancellation failed")
         return render_template("message.html", title="Cancellation failed", message="We could not cancel this subscription with PayPal. Please cancel it directly in your PayPal account and try again."), 502
 
+def send_expiry_reminders():
+    # Send one English email five days before a 30-day one-time purchase expires.
+    if not (SMTP_USER and SMTP_PASSWORD and MAIL_FROM):
+        return
+    now = int(time.time())
+    with db_connect() as db:
+        rows = db.execute("""SELECT id,tier_name,email FROM memberships
+                             WHERE purchase_type='one_time' AND status='active'
+                             AND email IS NOT NULL AND email!='' AND reminder_sent_at IS NULL
+                             AND expires_at IS NOT NULL AND expires_at<=? AND expires_at>?""",
+                          (now + 5 * 86400, now)).fetchall()
+    import smtplib
+    from email.message import EmailMessage
+    for row in rows:
+        msg = EmailMessage()
+        msg["Subject"] = "Your BLOODFANG membership expires in 5 days"
+        msg["From"] = MAIL_FROM
+        msg["To"] = row["email"]
+        msg.set_content("Hello BLOODFANG member,\n\nYour one-time BLOODFANG " + row["tier_name"] + " membership expires in 5 days.\n\nIf you enjoyed your membership, you are welcome to purchase it again here:\n" + PUBLIC_BASE_URL + "/#ranks\n\nThank you for being part of BLOODFANG!\n\nBLOODFANG Team")
+        try:
+            with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=20) as smtp:
+                smtp.starttls()
+                smtp.login(SMTP_USER, SMTP_PASSWORD)
+                smtp.send_message(msg)
+            with db_connect() as db:
+                db.execute("UPDATE memberships SET reminder_sent_at=? WHERE id=? AND reminder_sent_at IS NULL", (now, row["id"]))
+        except Exception:
+            app.logger.exception("Could not send expiry reminder for membership id=%s", row["id"])
+
 def expire_memberships():
     now = int(time.time())
     with db_connect() as db:
@@ -448,6 +490,7 @@ def expire_memberships():
 init_db()
 _scheduler = BackgroundScheduler(daemon=True)
 _scheduler.add_job(expire_memberships, "interval", minutes=5, id="expire_memberships", max_instances=1, replace_existing=True)
+_scheduler.add_job(send_expiry_reminders, "interval", minutes=15, id="send_expiry_reminders", max_instances=1, replace_existing=True)
 _scheduler.start()
 @app.get("/logout")
 def logout():
