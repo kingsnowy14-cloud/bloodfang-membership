@@ -1,5 +1,7 @@
 import os
 import secrets
+import asyncio
+import discord
 from urllib.parse import urlencode
 
 import aiohttp
@@ -227,16 +229,31 @@ def init_db():
         if "reminder_sent_at" not in columns:
             db.execute("ALTER TABLE memberships ADD COLUMN reminder_sent_at INTEGER")
         db.execute("CREATE INDEX IF NOT EXISTS idx_memberships_expiry ON memberships(status, purchase_type, expires_at)")
+        db.execute("""CREATE TABLE IF NOT EXISTS app_settings (
+            key TEXT PRIMARY KEY, value TEXT NOT NULL
+        )""")
 
 
 def save_purchase(user_id, tier_name, provider_ref, purchase_type, expires_at, provider, email=None):
     now = int(time.time())
     with db_connect() as db:
+        existing = db.execute("SELECT id FROM memberships WHERE provider_ref=?", (str(provider_ref),)).fetchone()
         db.execute("""INSERT INTO memberships(user_id,tier_name,provider,provider_ref,purchase_type,status,expires_at,created_at,email)
                       VALUES(?,?,?,?,?,'active',?,?,?) ON CONFLICT(provider_ref) DO UPDATE SET
                       status='active', expires_at=excluded.expires_at, last_event=NULL,
                       email=COALESCE(excluded.email, memberships.email)""",
                    (str(user_id), tier_name, provider, str(provider_ref), purchase_type, expires_at, now, email))
+    if existing is None:
+        send_shop_log(
+            title="Membership purchase confirmed",
+            user_id=str(user_id),
+            tier_name=tier_name,
+            purchase_type=purchase_type,
+            provider=provider,
+            provider_ref=str(provider_ref),
+            expires_at=expires_at,
+            status="Paid / active",
+        )
 
 
 async def paypal_access_token(client):
@@ -382,6 +399,16 @@ def paypal_webhook():
                     with db_connect() as db:
                         db.execute("UPDATE memberships SET status='active', expires_at=?, last_event=? WHERE provider_ref=?",
                                    (expires_at, str(event.get("id", "")), provider_ref))
+                    send_shop_log(
+                        title="Membership payment / renewal confirmed",
+                        user_id=str(row["user_id"]),
+                        tier_name=row["tier_name"],
+                        purchase_type="subscription",
+                        provider="paypal",
+                        provider_ref=provider_ref,
+                        expires_at=expires_at,
+                        status="Payment confirmed / access extended",
+                    )
                 except Exception:
                     app.logger.exception("Could not extend PayPal subscription")
                     return {"error": "activation failed"}, 500
@@ -551,6 +578,89 @@ def health():
         "discord_roles_configured": bool(DISCORD_BOT_TOKEN and DISCORD_GUILD_ID),
         "database_path": DB_PATH,
     }
+
+
+# Discord slash command + purchase logging. /shoplog sets the channel where
+# confirmed purchases and subscription renewals are posted.
+shop_bot = None
+
+def send_shop_log(title, user_id, tier_name, purchase_type, provider, provider_ref, expires_at, status):
+    bot = shop_bot
+    if bot is None or not bot.is_ready():
+        app.logger.warning("Shop log skipped because the Discord bot is not ready.")
+        return
+    with db_connect() as db:
+        row = db.execute("SELECT value FROM app_settings WHERE key='shoplog_channel_id'").fetchone()
+    if not row:
+        app.logger.info("Shop log channel is not configured. Run /shoplog in the desired channel.")
+        return
+    channel_id = int(row["value"])
+    expiry_text = f"<t:{int(expires_at)}:F>" if expires_at else "Not set"
+    embed = discord.Embed(title=f"🛒 {title}", color=discord.Color.from_rgb(153, 0, 0), timestamp=discord.utils.utcnow())
+    embed.add_field(name="Member", value=f"<@{user_id}> (ID: {user_id})", inline=False)
+    embed.add_field(name="Membership", value=tier_name, inline=True)
+    embed.add_field(name="Purchase type", value=purchase_type.replace("_", " ").title(), inline=True)
+    embed.add_field(name="Payment provider", value=provider.upper(), inline=True)
+    embed.add_field(name="Status", value=status, inline=True)
+    embed.add_field(name="Access expires", value=expiry_text, inline=False)
+    embed.add_field(name="Reference", value=provider_ref[:1000], inline=False)
+    coro = _send_shop_log_message(channel_id, embed)
+    asyncio.run_coroutine_threadsafe(coro, bot.loop)
+
+async def _send_shop_log_message(channel_id, embed):
+    try:
+        channel = shop_bot.get_channel(channel_id) or await shop_bot.fetch_channel(channel_id)
+        await channel.send(embed=embed, allowed_mentions=discord.AllowedMentions.none())
+    except Exception:
+        app.logger.exception("Could not post purchase log to Discord channel %s", channel_id)
+
+def start_discord_shop_bot():
+    global shop_bot
+    if not DISCORD_BOT_TOKEN:
+        app.logger.warning("Discord shop logging bot is disabled: DISCORD_BOT_TOKEN is missing.")
+        return
+    import threading
+    from discord.ext import commands
+    intents = discord.Intents.default()
+    shop_bot = commands.Bot(command_prefix="!", intents=intents)
+
+    @shop_bot.tree.command(name="shoplog", description="Set this channel as the BLOODFANG purchase log channel")
+    @discord.app_commands.default_permissions(manage_guild=True)
+    async def shoplog(interaction: discord.Interaction):
+        if not interaction.guild or interaction.guild.id != int(DISCORD_GUILD_ID):
+            await interaction.response.send_message("This command can only be used in the configured BLOODFANG server.", ephemeral=True)
+            return
+        if not interaction.user.guild_permissions.manage_guild:
+            await interaction.response.send_message("You need Manage Server permission to set the shop log channel.", ephemeral=True)
+            return
+        with db_connect() as db:
+            db.execute("INSERT INTO app_settings(key,value) VALUES('shoplog_channel_id',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+                       (str(interaction.channel_id),))
+        await interaction.response.send_message(
+            f"✅ Shop logs will be posted in <#{interaction.channel_id}>. New confirmed membership purchases and subscription renewals will appear here.",
+            ephemeral=True,
+        )
+
+    @shop_bot.event
+    async def on_ready():
+        try:
+            guild = discord.Object(id=int(DISCORD_GUILD_ID))
+            shop_bot.tree.copy_global_to(guild=guild)
+            synced = await shop_bot.tree.sync(guild=guild)
+            app.logger.info("Discord shop logging bot ready as %s; synced %s guild commands.", shop_bot.user, len(synced))
+        except Exception:
+            app.logger.exception("Could not sync Discord slash commands")
+
+    def runner():
+        try:
+            shop_bot.run(DISCORD_BOT_TOKEN, log_handler=None)
+        except Exception:
+            app.logger.exception("Discord shop logging bot stopped unexpectedly")
+
+    threading.Thread(target=runner, name="discord-shoplog-bot", daemon=True).start()
+
+# Start after DB initialization so the slash command can safely persist its channel.
+start_discord_shop_bot()
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", "8080"))
