@@ -449,13 +449,24 @@ async def shoplog(interaction: discord.Interaction):
     )
 
 
-DONATION_ROLE_NAMES = [
-    "Donator", "Bronze", "Silver", "Gold", "Platinum", "Diamond",
-    "Sapphire", "Emerald", "Ruby", "Obsidian", "Amethyst", "Dark Matter", "Blood God",
+DONATION_ROLES = [
+    ("💸 Donator", "#95A5A6", ["Donator", "🩸 Donator"]),
+    ("🥉 Bronze", "#CD7F32", ["Bronze", "🩸 Bronze"]),
+    ("🥈 Silver", "#C0C0C0", ["Silver", "🩸 Silver"]),
+    ("🥇 Gold", "#FFD700", ["Gold", "🩸 Gold"]),
+    ("💎 Platinum", "#7FDBFF", ["Platinum", "🩸 Platinum"]),
+    ("💠 Diamond", "#00BFFF", ["Diamond", "🩸 Diamond"]),
+    ("🔹 Sapphire", "#0F52BA", ["Sapphire", "🩸 Sapphire"]),
+    ("🟢 Emerald", "#50C878", ["Emerald", "🩸 Emerald"]),
+    ("❤️ Ruby", "#E0115F", ["Ruby", "🩸 Ruby"]),
+    ("⚫ Obsidian", "#343434", ["Obsidian", "🩸 Obsidian"]),
+    ("🟣 Amethyst", "#9966CC", ["Amethyst", "🩸 Amethyst"]),
+    ("🌌 Dark Matter", "#301934", ["Dark Matter", "🩸 Dark Matter"]),
+    ("👑 Blood God", "#8B0000", ["Blood God", "🩸 Blood God"]),
 ]
 
 async def ensure_donation_roles(guild: discord.Guild) -> None:
-    """Create donation ranks and order them below the configured anchor role."""
+    """Create, style, and order donation ranks below the configured anchor role."""
     anchor_id = 1564594346370670612
     anchor = guild.get_role(anchor_id)
     if anchor is None:
@@ -463,17 +474,22 @@ async def ensure_donation_roles(guild: discord.Guild) -> None:
         return
     role_map = {role.name: role for role in guild.roles}
     donation_roles = []
-    for name in DONATION_ROLE_NAMES:
-        full_name = f"🩸 {name}"
-        role = role_map.get(full_name)
-        if role is None:
-            try:
-                role = await guild.create_role(name=full_name, mentionable=False, reason="Set up BLOODFANG donation ranks")
-                log.info("Created donation role %s", full_name)
-            except discord.Forbidden:
-                log.error("Cannot create %s: bot needs Manage Roles permission", full_name)
-                return
-        donation_roles.append(role)
+    for full_name, color_hex, old_names in DONATION_ROLES:
+        role = next((role_map[n] for n in [full_name, *old_names] if n in role_map), None)
+        color = discord.Colour(int(color_hex.lstrip('#'), 16))
+        try:
+            if role is None:
+                role = await guild.create_role(name=full_name, colour=color, hoist=True, mentionable=False, reason="Set up BLOODFANG donation ranks")
+                log.info('Created donation role %s', full_name)
+            else:
+                await role.edit(name=full_name, colour=color, hoist=True, mentionable=False, reason="Style and group BLOODFANG donation rank")
+            donation_roles.append(role)
+        except discord.Forbidden:
+            log.error("Cannot create or update %s: bot needs Manage Roles permission and a higher role position", full_name)
+            return
+        except discord.HTTPException:
+            log.exception("Discord rejected create/update for donation role %s", full_name)
+            return
     if guild.me is None or guild.me.top_role <= anchor:
         log.error("Move the bot highest role above anchor role %s before arranging donation roles", anchor_id)
         return
@@ -488,12 +504,11 @@ async def ensure_donation_roles(guild: discord.Guild) -> None:
         position -= 1
     try:
         await guild.edit_role_positions(positions=positions, reason="Arrange donation ranks below configured role")
-        log.info("Donation roles ordered below role %s", anchor_id)
+        log.info("Donation roles styled and ordered below role %s", anchor_id)
     except discord.Forbidden:
         log.error("Cannot reorder roles; ensure the bot highest role is above the anchor role")
     except discord.HTTPException:
         log.exception("Discord rejected donation-role position update")
-
 @bot.event
 async def on_ready():
     # Apply the first status immediately, then switch to the other every 2 minutes.
