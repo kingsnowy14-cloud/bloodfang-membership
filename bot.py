@@ -47,6 +47,7 @@ async def help_command(ctx):
         value=(
             "`!membership` — Mitgliedschafts-Ränge und Preise per DM\n"
             "`!pointshop` — Points-Pakete und Preise per DM\n"
+            "`!donat` — Donation-Ränge und Storage-Boni per DM\n"
             "`/mymembership` — Eigene Mitgliedschaft prüfen"
         ),
         inline=False,
@@ -62,6 +63,7 @@ async def help_command(ctx):
 STATUS_ACTIVITIES = [
     discord.Game(name="!membership"),
     discord.Game(name="!pointshop"),
+    discord.Game(name="!donat"),
 ]
 _status_index = 0
 
@@ -71,7 +73,7 @@ MEMBERSHIPS = [
     ("APEX", "€19.99", "200,000 Bloodpoints/day", "9 storage"),
     ("BLOOD EMPEROR", "€29.99", "350,000 Bloodpoints/day", "10 storage"),
     ("BLOOD TITAN", "€50.00", "1,000,000 Bloodpoints/day", "13 storage"),
-    ("BLOOD GOD", "€100.00", "2,000,000 Bloodpoints/day", "20 storage"),
+    ("BLOOD GOD", "€120.00", "2,000,000 Bloodpoints/day", "20 storage"),
 ]
 
 POINT_PACKAGES = [
@@ -237,7 +239,12 @@ async def send_offer_dm(ctx, title, description, fields, footer):
             mention_author=False,
         )
         return
-    await ctx.reply("I've sent you the offers in DMs. 🩸", mention_author=False)
+    # Remove the public prefix command so it doesn't clutter the channel.
+    try:
+        await ctx.message.delete()
+    except (discord.Forbidden, discord.NotFound):
+        pass
+    await ctx.send(f"{ctx.author.mention} I've sent you the offers in DMs. 🩸", delete_after=8)
 
 
 @bot.command(name="membership")
@@ -273,6 +280,33 @@ async def pointshop(ctx):
         "Available points packages and prices (EUR):",
         fields,
         "Purchase through the official BLOODFANG Points Shop.",
+    )
+
+
+@bot.command(name="donat")
+@commands.guild_only()
+async def donation_ranks(ctx):
+    fields = [
+        ("🩸 Donator — €1–5", "Storage bonus at this lifetime donation total: **+1 slot**"),
+        ("🥉 Bronze — €6–14", "Total storage bonus: **+2 slots**"),
+        ("🥈 Silver — €15–24", "Total storage bonus: **+3 slots**"),
+        ("🥇 Gold — €25–49", "Total storage bonus: **+4 slots**"),
+        ("💎 Platinum — €50–74", "Total storage bonus: **+5 slots**"),
+        ("💠 Diamond — €75–99", "Total storage bonus: **+6 slots**"),
+        ("🔷 Sapphire — €100–149", "Total storage bonus: **+7 slots**"),
+        ("🟢 Emerald — €150–199", "Total storage bonus: **+8 slots**"),
+        ("🔴 Ruby — €200–299", "Total storage bonus: **+9 slots**"),
+        ("⚫ Obsidian — €300–499", "Total storage bonus: **+10 slots**"),
+        ("🟣 Amethyst — €500–749", "Total storage bonus: **+12 slots**"),
+        ("🌑 Dark Matter — €750–999", "Total storage bonus: **+14 slots**"),
+        ("👑 Blood God — €1,000+", "Total storage bonus: **+16 slots**"),
+    ]
+    await send_offer_dm(
+        ctx,
+        "BLOODFANG Donation Ranks",
+        "Your lifetime confirmed donation total determines your rank. Storage bonuses are total bonuses added to your existing membership storage; they are not stacked again at every rank-up.",
+        fields,
+        "Donate through the official BLOODFANG website: " + os.environ.get("PUBLIC_BASE_URL", "https://bloodfang-membership.up.railway.app").rstrip("/") + "/donate",
     )
 
 
