@@ -309,6 +309,27 @@ async def create_paypal_checkout(user, tier, purchase_type):
             return next(link["href"] for link in data["links"] if link["rel"] == "approve")
 
 
+@app.get("/donate")
+def donate_page():
+    session["donate_csrf"] = secrets.token_urlsafe(24) if session.get("discord_user") else ""
+    return render_template("donate.html", user=session.get("discord_user"), csrf_token=session.get("donate_csrf"), paypal_configured=bool(PAYPAL_CLIENT_ID and PAYPAL_CLIENT_SECRET))
+
+@app.post("/donate/checkout")
+def donate_checkout():
+    user = session.get("discord_user")
+    if not user:
+        return redirect(url_for("login", next="/donate/checkout"))
+    token = session.pop("donate_csrf", "")
+    if not token or not secrets.compare_digest(token, request.form.get("csrf_token", "")):
+        return render_template("message.html", title="Form expired", message="Return to the donation page and try again."), 400
+    try:
+        amount = round(float(request.form.get("amount", "").replace(",", ".")), 2)
+    except (ValueError, TypeError):
+        amount = 0
+    if amount < 1 or amount > 1000:
+        return render_template("message.html", title="Invalid amount", message="Choose between EUR 1 and EUR 1,000."), 400
+    return render_template("message.html", title="Donation setup incomplete", message="The donation checkout is not yet active. No payment was taken."), 503
+
 @app.get("/payment/success")
 def payment_success():
     return render_template("message.html", title="Payment processing",
