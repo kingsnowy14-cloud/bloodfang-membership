@@ -363,6 +363,26 @@ async def mymembership(interaction: discord.Interaction):
         )
 
 
+@bot.tree.command(name="donat", description="Set up the pinned BLOODFANG donation leaderboard in this channel")
+@discord.app_commands.default_permissions(manage_guild=True)
+async def donat(interaction: discord.Interaction):
+    if not interaction.guild or interaction.guild.id != int(os.environ.get("DISCORD_GUILD_ID", "1561027077984227371")):
+        await interaction.response.send_message("This command can only be used in the configured BLOODFANG server.", ephemeral=True)
+        return
+    if not interaction.user.guild_permissions.manage_guild:
+        await interaction.response.send_message("You need Manage Server permission to configure the donation leaderboard.", ephemeral=True)
+        return
+    channel = interaction.channel
+    if not channel or not channel.permissions_for(interaction.guild.me).manage_webhooks:
+        await interaction.response.send_message("I need Manage Webhooks permission in this channel.", ephemeral=True)
+        return
+    try:
+        webhook = await channel.create_webhook(name="BLOODFANG Donations", reason=f"Donation leaderboard configured by {interaction.user}")
+    except discord.Forbidden:
+        await interaction.response.send_message("I cannot create a webhook here. Give me Manage Webhooks permission and try again.", ephemeral=True)
+        return
+    await interaction.response.send_message("Donation channel configured. Add these variables to the WEBSITE service in Railway, then redeploy:\nDONATION_WEBHOOK_URL = " + webhook.url + "\nDONATION_CHANNEL_ID = " + str(channel.id) + "\nKeep the webhook URL secret. The leaderboard is created and pinned after the first confirmed PayPal donation.", ephemeral=True)
+
 @bot.tree.command(name="shoplog", description="Create the BLOODFANG purchase log in this channel")
 @discord.app_commands.default_permissions(manage_guild=True)
 async def shoplog(interaction: discord.Interaction):
