@@ -472,7 +472,9 @@ async def ensure_donation_roles(guild: discord.Guild) -> None:
     if anchor is None:
         log.error("Donation-role anchor %s was not found in guild %s", anchor_id, guild.id)
         return
-    role_map = {role.name: role for role in guild.roles}
+    # This is a bot role, not a donation rank; never rename, recolor, or reposition it.
+    protected_bot_role_id = 1561400086074753136
+    role_map = {role.name: role for role in guild.roles if role.id != protected_bot_role_id}
     donation_roles = []
     for full_name, color_hex, old_names in DONATION_ROLES:
         role = next((role_map[n] for n in [full_name, *old_names] if n in role_map), None)
