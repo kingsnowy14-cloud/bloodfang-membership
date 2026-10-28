@@ -177,6 +177,8 @@ async def assign_membership_role(user_id, tier_name):
             roles = await response.json()
         role = next((r for r in roles if r.get("name", "").casefold() == tier_name.casefold()), None)
         if not role:
+            role = next((r for r in roles if r.get("name", "").casefold().endswith(tier_name.casefold())), None)
+        if not role:
             raise RuntimeError(f"The Discord role '{tier_name}' does not exist. Create it first.")
         async with client.put(f"{base_url}/guilds/{DISCORD_GUILD_ID}/members/{user_id}/roles/{role['id']}",
                               headers=headers, json={}) as response:
@@ -333,7 +335,7 @@ def donate_page():
 def donate_checkout():
     user = session.get("discord_user")
     if not user:
-        return redirect(url_for("login", next="/donate/checkout"))
+        return redirect(url_for("login", next="/donate"))
     token = session.pop("donate_csrf", "")
     if not token or not secrets.compare_digest(token, request.form.get("csrf_token", "")):
         return render_template("message.html", title="Form expired", message="Return to the donation page and try again."), 400
@@ -343,7 +345,95 @@ def donate_checkout():
         amount = 0
     if amount < 1 or amount > 1000:
         return render_template("message.html", title="Invalid amount", message="Choose between EUR 1 and EUR 1,000."), 400
-    return render_template("message.html", title="Donation setup incomplete", message="The donation checkout is not yet active. No payment was taken."), 503
+    if not (PAYPAL_CLIENT_ID and PAYPAL_CLIENT_SECRET and PAYPAL_WEBHOOK_ID and PUBLIC_BASE_URL):
+        return render_template("message.html", title="Donation checkout not configured", message="Configure PayPal credentials, webhook ID and the public website URL in Railway. No payment was taken."), 503
+    if not DISCORD_BOT_TOKEN or not DISCORD_GUILD_ID:
+        return render_template("message.html", title="Discord role assignment is not configured", message="Set DISCORD_BOT_TOKEN and DISCORD_GUILD_ID in Railway."), 503
+    anonymous = request.form.get("anonymous") == "yes"
+    display_name = "__anonymous__" if anonymous else (user.get("global_name") or user.get("username") or "Donator")
+    import asyncio
+    try:
+        checkout_url = asyncio.run(create_paypal_donation(user["id"], amount, display_name, anonymous))
+    except Exception:
+        app.logger.exception("Could not create PayPal donation checkout")
+        return render_template("message.html", title="Donation checkout failed", message="PayPal could not start the donation. No donation role was granted."), 502
+    return redirect(checkout_url)
+
+
+async def create_paypal_donation(user_id, amount, display_name, anonymous):
+    async with aiohttp.ClientSession() as client:
+        token = await paypal_access_token(client)
+        headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+        custom_id = json.dumps({"kind": "donation", "user_id": str(user_id), "display_name": display_name, "anonymous": bool(anonymous)})
+        payload = {"intent": "CAPTURE", "purchase_units": [{"custom_id": custom_id, "description": "BLOODFANG donation",
+                   "amount": {"currency_code": "EUR", "value": f"{amount:.2f}"}}],
+                   "application_context": {"brand_name": "BLOODFANG", "user_action": "PAY_NOW",
+                   "return_url": PUBLIC_BASE_URL + "/paypal/return", "cancel_url": PUBLIC_BASE_URL + "/donate"}}
+        async with client.post(PAYPAL_API + "/v2/checkout/orders", headers=headers, json=payload) as response:
+            data = await response.json()
+            if response.status >= 300:
+                raise RuntimeError("PayPal donation order could not be created: " + str(data.get("message", "check PayPal setup")))
+            return next(link["href"] for link in data["links"] if link["rel"] == "approve")
+
+
+DONATION_RANKS = [
+    (100000, "👑 Blood God"), (75000, "🌌 Dark Matter"), (50000, "🟣 Amethyst"),
+    (30000, "⚫ Obsidian"), (20000, "❤️ Ruby"), (15000, "🟢 Emerald"),
+    (10000, "🔹 Sapphire"), (7500, "💠 Diamond"), (5000, "💎 Platinum"),
+    (2500, "🥇 Gold"), (1500, "🥈 Silver"), (600, "🥉 Bronze"), (100, "💸 Donator"),
+]
+
+
+async def assign_donation_rank(user_id, total_cents):
+    rank_name = next((name for threshold, name in DONATION_RANKS if total_cents >= threshold), None)
+    if not rank_name:
+        return None
+    headers = {"Authorization": f"Bot {DISCORD_BOT_TOKEN}", "Content-Type": "application/json"}
+    base = "https://discord.com/api/v10"
+    async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=15)) as client:
+        async with client.get(f"{base}/guilds/{DISCORD_GUILD_ID}/roles", headers=headers) as response:
+            if response.status != 200:
+                raise RuntimeError(f"Discord role lookup failed (HTTP {response.status})")
+            roles = await response.json()
+        target = next((r for r in roles if r.get("name", "").casefold() == rank_name.casefold()), None)
+        if not target:
+            target = next((r for r in roles if r.get("name", "").casefold().endswith(rank_name.casefold())), None)
+        if not target:
+            raise RuntimeError(f"Donation role {rank_name} was not found; let the bot create donation roles first.")
+        member_url = f"{base}/guilds/{DISCORD_GUILD_ID}/members/{user_id}"
+        async with client.get(member_url, headers=headers) as response:
+            if response.status == 404:
+                raise RuntimeError("Donor must join the Discord server before a role can be assigned.")
+            if response.status != 200:
+                raise RuntimeError(f"Discord member lookup failed (HTTP {response.status})")
+            member = await response.json()
+        current_ids = set(member.get("roles", []))
+        donation_names = [name for _, name in reversed(DONATION_RANKS)]
+        for role in roles:
+            role_name = role.get("name", "")
+            is_donation_role = any(role_name.casefold() == n.casefold() or role_name.casefold().endswith(n.casefold()) for n in donation_names)
+            if is_donation_role and role["id"] in current_ids and role["id"] != target["id"]:
+                async with client.delete(f"{member_url}/roles/{role['id']}", headers=headers) as response:
+                    if response.status not in (200, 204):
+                        raise RuntimeError(f"Discord could not remove previous donation rank (HTTP {response.status})")
+        if target["id"] not in current_ids:
+            async with client.put(f"{member_url}/roles/{target['id']}", headers=headers, json={}) as response:
+                if response.status not in (200, 204):
+                    raise RuntimeError(f"Discord could not assign donation rank (HTTP {response.status})")
+    return rank_name
+
+
+def record_confirmed_donation(capture_id, user_id, display_name, amount_cents, anonymous=False):
+    if not capture_id or not str(user_id).isdigit() or amount_cents < 100:
+        raise RuntimeError("Confirmed PayPal donation is missing valid capture details.")
+    with db_connect() as db:
+        db.execute("INSERT OR IGNORE INTO donations(paypal_capture_id,user_id,display_name,amount_cents,anonymous,created_at) VALUES(?,?,?,?,?,?)",
+                   (str(capture_id), str(user_id), "__anonymous__" if anonymous else str(display_name)[:100], int(amount_cents), int(bool(anonymous)), int(time.time())))
+        total = db.execute("SELECT COALESCE(SUM(amount_cents),0) AS total FROM donations WHERE user_id=?", (str(user_id),)).fetchone()["total"]
+    import asyncio
+    rank = asyncio.run(assign_donation_rank(str(user_id), int(total)))
+    return rank, int(total)
+
 
 @app.get("/payment/success")
 def payment_success():
@@ -362,7 +452,13 @@ def paypal_return():
         if order_id:
             result = asyncio.run(capture_paypal_order(order_id))
             if result:
-                user_id, tier_name, ref, payer_email = result
+                if result.get("kind") == "donation":
+                    rank, total = record_confirmed_donation(result["capture_id"], result["user_id"], result["display_name"],
+                                                           result["amount_cents"], result["anonymous"])
+                    rank_text = f" Your donation rank is {rank}." if rank else " Your total has been recorded; no rank threshold reached yet."
+                    return render_template("message.html", title="Donation confirmed",
+                                           message=f"Your EUR {result['amount_cents'] / 100:.2f} donation is confirmed.{rank_text}")
+                user_id, tier_name, ref, payer_email = result["user_id"], result["tier"], result["ref"], result.get("email")
                 asyncio.run(assign_membership_role(user_id, tier_name))
                 save_purchase(user_id, tier_name, ref, "one_time", int(time.time()) + 30 * 86400, "paypal", email=payer_email)
                 return render_template("message.html", title="Purchase complete",
@@ -384,10 +480,22 @@ async def capture_paypal_order(order_id):
             if response.status >= 300 and data.get("status") != "COMPLETED":
                 raise RuntimeError("PayPal capture was not successful.")
         unit = data.get("purchase_units", [{}])[0]
-        custom = json.loads(unit.get("payments", {}).get("captures", [{}])[0].get("custom_id") or unit.get("custom_id") or "{}")
-        if data.get("status") != "COMPLETED" or not custom.get("user_id") or not custom.get("tier"):
+        capture = unit.get("payments", {}).get("captures", [{}])[0]
+        custom = json.loads(capture.get("custom_id") or unit.get("custom_id") or "{}")
+        if data.get("status") != "COMPLETED" or not custom.get("user_id"):
             return None
-        return str(custom["user_id"]), custom["tier"], "paypal-order-" + order_id, (data.get("payer") or {}).get("email_address")
+        if custom.get("kind") == "donation":
+            if capture.get("status") != "COMPLETED" or capture.get("amount", {}).get("currency_code") != "EUR":
+                return None
+            return {"kind": "donation", "user_id": str(custom["user_id"]),
+                    "display_name": custom.get("display_name") or "Donator",
+                    "anonymous": bool(custom.get("anonymous")),
+                    "amount_cents": int(round(float(capture["amount"]["value"]) * 100)),
+                    "capture_id": capture.get("id") or "paypal-order-" + order_id}
+        if not custom.get("tier"):
+            return None
+        return {"kind": "membership", "user_id": str(custom["user_id"]), "tier": custom["tier"],
+                "ref": "paypal-order-" + order_id, "email": (data.get("payer") or {}).get("email_address")}
 
 
 async def verify_paypal_webhook(headers, event):
