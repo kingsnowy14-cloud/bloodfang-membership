@@ -71,7 +71,7 @@ MEMBERSHIPS = [
     ("APEX", "€19.99", "200,000 Bloodpoints/day", "9 storage"),
     ("BLOOD EMPEROR", "€29.99", "350,000 Bloodpoints/day", "10 storage"),
     ("BLOOD TITAN", "€50.00", "1,000,000 Bloodpoints/day", "13 storage"),
-    ("BLOOD GOD", "€100.00", "1,600,000 Bloodpoints/day", "20 storage"),
+    ("BLOOD GOD", "€100.00", "2,000,000 Bloodpoints/day", "20 storage"),
 ]
 
 POINT_PACKAGES = [
