@@ -244,6 +244,15 @@ def init_db():
         db.execute("""CREATE TABLE IF NOT EXISTS app_settings (
             key TEXT PRIMARY KEY, value TEXT NOT NULL
         )""")
+        db.execute("""CREATE TABLE IF NOT EXISTS donations (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            paypal_capture_id TEXT NOT NULL UNIQUE,
+            user_id TEXT NOT NULL,
+            display_name TEXT NOT NULL,
+            amount_cents INTEGER NOT NULL,
+            anonymous INTEGER NOT NULL DEFAULT 0,
+            created_at INTEGER NOT NULL
+        )""")
 
 
 def save_purchase(user_id, tier_name, provider_ref, purchase_type, expires_at, provider, email=None):
@@ -312,7 +321,13 @@ async def create_paypal_checkout(user, tier, purchase_type):
 @app.get("/donate")
 def donate_page():
     session["donate_csrf"] = secrets.token_urlsafe(24) if session.get("discord_user") else ""
-    return render_template("donate.html", user=session.get("discord_user"), csrf_token=session.get("donate_csrf"), paypal_configured=bool(PAYPAL_CLIENT_ID and PAYPAL_CLIENT_SECRET))
+    with db_connect() as db:
+        rows = db.execute("""SELECT user_id, display_name, SUM(amount_cents) AS total_cents, COUNT(*) AS donation_count
+                             FROM donations GROUP BY user_id, display_name
+                             ORDER BY total_cents DESC, donation_count DESC, display_name COLLATE NOCASE ASC LIMIT 5""").fetchall()
+    leaderboard = [{"rank": i + 1, "name": ("Anonymous donor" if row["display_name"] == "__anonymous__" else row["display_name"]),
+                    "total": f"{row['total_cents'] / 100:.2f}"} for i, row in enumerate(rows)]
+    return render_template("donate.html", user=session.get("discord_user"), csrf_token=session.get("donate_csrf"), paypal_configured=bool(PAYPAL_CLIENT_ID and PAYPAL_CLIENT_SECRET), leaderboard=leaderboard)
 
 @app.post("/donate/checkout")
 def donate_checkout():
