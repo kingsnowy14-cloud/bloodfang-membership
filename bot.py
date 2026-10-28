@@ -363,6 +363,12 @@ async def mymembership(interaction: discord.Interaction):
         )
 
 
+@bot.command(name="website", aliases=["site"])
+async def website(ctx):
+    """Show the official BLOODFANG website link."""
+    website_url = os.environ.get("PUBLIC_BASE_URL", "https://bloodfang-membership.up.railway.app").rstrip("/")
+    await ctx.reply(f"🌐 **BLOODFANG Website:** {website_url}", mention_author=False)
+
 @bot.tree.command(name="donat", description="Set up the pinned BLOODFANG donation leaderboard in this channel")
 @discord.app_commands.default_permissions(manage_guild=True)
 async def donat(interaction: discord.Interaction):
