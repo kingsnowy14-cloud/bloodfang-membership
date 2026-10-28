@@ -25,7 +25,7 @@ TIERS = [
     {"name":"APEX","emoji":"☠️","price":"19,99","points":"200.000","storage":"9"},
     {"name":"BLOOD EMPEROR","emoji":"🔥","price":"29,99","points":"350.000","storage":"10"},
     {"name":"BLOOD TITAN","emoji":"💀","price":"50,00","points":"1.000.000","storage":"13"},
-    {"name":"BLOOD GOD","emoji":"👹","price":"100,00","points":"1.600.000","storage":"20"},
+    {"name":"BLOOD GOD","emoji":"👹","price":"120,00","points":"2.000.000","storage":"20"},
 ]
 
 POINT_PACKAGES = [
