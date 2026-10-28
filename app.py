@@ -541,8 +541,26 @@ def paypal_webhook():
             app.logger.exception("Could not activate PayPal subscription")
             return {"error": "activation failed"}, 500
     elif event_type in ("PAYMENT.SALE.COMPLETED", "PAYMENT.CAPTURE.COMPLETED"):
-        # For subscriptions, a completed sale extends the access window from its payment time.
+        # Donation captures are processed idempotently by the PayPal capture ID.
         billing_agreement_id = resource.get("billing_agreement_id") or resource.get("supplementary_data", {}).get("related_ids", {}).get("subscription_id")
+        custom_raw = resource.get("custom_id") or ""
+        if custom_raw and not billing_agreement_id:
+            try:
+                meta = json.loads(custom_raw)
+                if meta.get("kind") == "donation":
+                    amount = resource.get("amount") or resource.get("seller_receivable_breakdown", {}).get("gross_amount") or {}
+                    if amount.get("currency_code") == "EUR" and resource.get("status", "COMPLETED") == "COMPLETED":
+                        rank, total = record_confirmed_donation(
+                            resource.get("id") or event.get("id"),
+                            str(meta["user_id"]),
+                            meta.get("display_name") or "Donator",
+                            int(round(float(amount["value"]) * 100)),
+                            bool(meta.get("anonymous")),
+                        )
+                        app.logger.info("Donation recorded user=%s total_cents=%s rank=%s", meta["user_id"], total, rank)
+            except Exception:
+                app.logger.exception("Could not process confirmed PayPal donation webhook")
+                return {"error": "donation processing failed"}, 500
         if billing_agreement_id:
             provider_ref = "paypal-sub-" + str(billing_agreement_id)
             with db_connect() as db:
