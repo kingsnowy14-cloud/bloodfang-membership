@@ -3,5 +3,29 @@
 <header class="topbar"><a class="brand" href="/">BLOOD<span>FANG</span></a><nav class="main-nav"><a class="navbtn" href="/">Home</a><a class="navbtn" href="/#ranks">Memberships</a><a class="navbtn" href="/points-shop">Points Shop</a>{% if user %}<span class="user">Signed in: {{ user.global_name }}</span><a class="navbtn" href="/logout">Sign out</a>{% else %}<a class="navbtn" href="/login?next=/donate/checkout">Connect Discord</a>{% endif %}</nav></header>
 <main><section class="donate-panel"><div class="eyebrow">SUPPORT THE COMMUNITY</div><h1>KEEP THE <span style="color:#d72b3f">BLOODFANG</span><br>COMMUNITY ALIVE.</h1><p>Your donation helps support the community. Choose any amount from €1 to €1,000. Payments are processed securely by PayPal.</p>
 {% if not user %}<a class="primary" href="/login?next=/donate/checkout">Connect Discord to donate <span>↗</span></a>{% elif not paypal_configured %}<p class="donate-note">Donations are temporarily unavailable because PayPal is not configured on the website.</p>{% else %}<form class="donate-form" method="post" action="/donate/checkout"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><label for="amount">Donation amount (EUR)</label><input id="amount" name="amount" type="number" min="1" max="1000" step="0.01" value="5.00" required><label class="anon-choice"><input type="checkbox" name="anonymous" value="yes"> Show me as an anonymous donor on the public leaderboard</label><button class="primary" type="submit">Donate with PayPal <span>↗</span></button></form>{% endif %}
-<p class="donate-note">Only donations confirmed by PayPal are announced and added to the leaderboard. Anonymous donations appear as “Anonymous donor”.</p></section><section class="donor-leaderboard"><div class="eyebrow">COMMUNITY SUPPORTERS</div><h2>TOP 5 <span>DONATORS</span></h2><p class="leaderboard-subtitle">Ranked by total confirmed donations.</p>{% if leaderboard %}<ol class="donor-list">{% for donor in leaderboard %}<li><span class="donor-rank">#{{ donor.rank }}</span><span class="donor-name">{{ donor.name }}</span><strong>€{{ donor.total }}</strong></li>{% endfor %}</ol>{% else %}<div class="donor-empty">No confirmed donations yet. Be the first to support BLOODFANG!</div>{% endif %}</section></main>
+<p class="donate-note">Only donations confirmed by PayPal are announced and added to the leaderboard. Anonymous donations appear as “Anonymous donor”.</p></section><section class="donation-ranks">
+  <div class="eyebrow">DONATION REWARDS</div>
+  <h2>BLOODFANG <span>DONATOR RANKS</span></h2>
+  <p class="ranks-intro">Every confirmed donation counts toward your lifetime total. Each rank unlocks a higher total storage bonus, added to the storage you already have from your membership.</p>
+  <div class="rank-table-wrap"><table class="rank-table">
+    <thead><tr><th>Total donated</th><th>Donator rank</th><th>Total bonus storage</th></tr></thead>
+    <tbody>
+      <tr><td>€1–5</td><td>🩸 Donator</td><td>+1 slot</td></tr>
+      <tr><td>€6–14</td><td>🥉 Bronze</td><td>+2 slots</td></tr>
+      <tr><td>€15–24</td><td>🥈 Silver</td><td>+3 slots</td></tr>
+      <tr><td>€25–49</td><td>🥇 Gold</td><td>+4 slots</td></tr>
+      <tr><td>€50–74</td><td>💎 Platinum</td><td>+5 slots</td></tr>
+      <tr><td>€75–99</td><td>💠 Diamond</td><td>+6 slots</td></tr>
+      <tr><td>€100–149</td><td>🔷 Sapphire</td><td>+7 slots</td></tr>
+      <tr><td>€150–199</td><td>🟢 Emerald</td><td>+8 slots</td></tr>
+      <tr><td>€200–299</td><td>🔴 Ruby</td><td>+9 slots</td></tr>
+      <tr><td>€300–499</td><td>⚫ Obsidian</td><td>+10 slots</td></tr>
+      <tr><td>€500–749</td><td>🟣 Amethyst</td><td>+12 slots</td></tr>
+      <tr><td>€750–999</td><td>🌑 Dark Matter</td><td>+14 slots</td></tr>
+      <tr><td>€1,000+</td><td>👑 Blood God</td><td>+16 slots</td></tr>
+    </tbody>
+  </table></div>
+  <p class="ranks-note">Storage rewards are based on your lifetime confirmed donation total, not each individual payment. Your existing membership storage is preserved. For example, 20 existing slots + the Sapphire bonus of 7 = 27 total slots.</p>
+</section>
+<section class="donor-leaderboard"><div class="eyebrow">COMMUNITY SUPPORTERS</div><h2>TOP 5 <span>DONATORS</span></h2><p class="leaderboard-subtitle">Ranked by total confirmed donations.</p>{% if leaderboard %}<ol class="donor-list">{% for donor in leaderboard %}<li><span class="donor-rank">#{{ donor.rank }}</span><span class="donor-name">{{ donor.name }}</span><strong>€{{ donor.total }}</strong></li>{% endfor %}</ol>{% else %}<div class="donor-empty">No confirmed donations yet. Be the first to support BLOODFANG!</div>{% endif %}</section></main>
 <footer><a class="brand" href="/">BLOOD<span>FANG</span></a><span>Fan community · The Isle: Evrima</span><nav class="legal-links"><a href="/imprint">Legal Notice</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="/withdrawal">Withdrawal & Cancellation</a></nav></footer></body></html>
