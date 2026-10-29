@@ -511,6 +511,171 @@ async def ensure_donation_roles(guild: discord.Guild) -> None:
         log.error("Cannot reorder roles; ensure the bot highest role is above the anchor role")
     except discord.HTTPException:
         log.exception("Discord rejected donation-role position update")
+
+# Anti-nuke protection: monitor bursts of channel/role deletions.
+SECURITY_LOG_CHANNEL_ID = int(os.environ.get("SECURITY_LOG_CHANNEL_ID", "1561400393282625686"))
+ANTI_NUKE_WINDOW_SECONDS = int(os.environ.get("ANTI_NUKE_WINDOW_SECONDS", "10"))
+ANTI_NUKE_DELETE_THRESHOLD = int(os.environ.get("ANTI_NUKE_DELETE_THRESHOLD", "3"))
+_delete_events = {}
+_active_incidents = set()
+
+
+async def _security_log(guild, title, description, color=discord.Color.dark_red()):
+    channel = guild.get_channel(SECURITY_LOG_CHANNEL_ID)
+    if channel is None:
+        try:
+            channel = await guild.fetch_channel(SECURITY_LOG_CHANNEL_ID)
+        except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+            log.error("Security log channel %s is not accessible", SECURITY_LOG_CHANNEL_ID)
+            return
+    try:
+        embed = discord.Embed(title=title, description=description[:4000], color=color,
+                              timestamp=discord.utils.utcnow())
+        embed.set_footer(text="BLOODFANG Anti-Nuke • channel/role deletion monitor")
+        await channel.send(embed=embed, allowed_mentions=discord.AllowedMentions.none())
+    except (discord.Forbidden, discord.HTTPException):
+        log.exception("Could not post anti-nuke incident to security log channel")
+
+
+async def _find_delete_executor(guild, action, target_id):
+    for attempt in range(4):
+        try:
+            async for entry in guild.audit_logs(limit=8, action=action):
+                if getattr(entry.target, "id", None) == target_id:
+                    age = (discord.utils.utcnow() - entry.created_at).total_seconds()
+                    if age <= 20:
+                        return entry.user, entry
+        except (discord.Forbidden, discord.HTTPException):
+            log.exception("Cannot read audit log for guild %s", guild.id)
+            return None, None
+        if attempt < 3:
+            await asyncio.sleep(0.75)
+    return None, None
+
+
+async def _restore_deleted_channel(guild, snapshot):
+    try:
+        overwrites = {}
+        for target, overwrite in snapshot.overwrites.items():
+            if isinstance(target, discord.Role):
+                replacement = guild.get_role(target.id)
+            elif isinstance(target, discord.Member):
+                replacement = guild.get_member(target.id)
+            else:
+                replacement = None
+            if replacement is not None:
+                overwrites[replacement] = overwrite
+        category = guild.get_channel(snapshot.category_id) if snapshot.category_id else None
+        common = {
+            "name": snapshot.name, "overwrites": overwrites,
+            "category": category if isinstance(category, discord.CategoryChannel) else None,
+            "position": snapshot.position,
+            "reason": "BLOODFANG Anti-Nuke: restore after mass deletion",
+        }
+        if isinstance(snapshot, discord.CategoryChannel):
+            restored = await guild.create_category(
+                name=snapshot.name, overwrites=overwrites,
+                reason=common["reason"])
+        elif isinstance(snapshot, discord.TextChannel):
+            restored = await guild.create_text_channel(
+                **common, topic=snapshot.topic, nsfw=snapshot.nsfw,
+                slowmode_delay=snapshot.slowmode_delay,
+                default_auto_archive_duration=snapshot.default_auto_archive_duration)
+        elif isinstance(snapshot, discord.VoiceChannel):
+            restored = await guild.create_voice_channel(
+                **common, bitrate=snapshot.bitrate, user_limit=snapshot.user_limit,
+                rtc_region=snapshot.rtc_region, video_quality_mode=snapshot.video_quality_mode)
+        elif isinstance(snapshot, discord.StageChannel):
+            restored = await guild.create_stage_channel(
+                **common, topic=snapshot.topic, bitrate=snapshot.bitrate,
+                user_limit=snapshot.user_limit, rtc_region=snapshot.rtc_region)
+        else:
+            return None
+        return restored
+    except (discord.Forbidden, discord.HTTPException, TypeError, AttributeError):
+        log.exception("Failed to restore deleted channel %s", getattr(snapshot, "name", "?"))
+        return None
+
+
+async def _restore_deleted_role(guild, snapshot):
+    try:
+        if snapshot.is_default() or snapshot.managed:
+            return None
+        return await guild.create_role(
+            name=snapshot.name, permissions=snapshot.permissions, colour=snapshot.colour,
+            hoist=snapshot.hoist, mentionable=snapshot.mentionable,
+            reason="BLOODFANG Anti-Nuke: restore after mass deletion")
+    except (discord.Forbidden, discord.HTTPException):
+        log.exception("Failed to restore deleted role %s", getattr(snapshot, "name", "?"))
+        return None
+
+
+async def _handle_delete_event(guild, target, kind, audit_action):
+    executor, entry = await _find_delete_executor(guild, audit_action, target.id)
+    if executor is None:
+        await _security_log(
+            guild, "⚠️ Deletion detected — executor unknown",
+            f"Type: {kind}\nDeleted: {getattr(target, 'name', 'unknown')} (ID {target.id})\n"
+            "Could not identify the executor from audit logs. Ensure I have View Audit Log permission.",
+            discord.Color.orange())
+        return
+    if executor.bot or executor.id == guild.owner_id or executor.id == (bot.user.id if bot.user else 0):
+        return
+
+    now = time.monotonic()
+    key = (guild.id, executor.id)
+    events = _delete_events.setdefault(key, [])
+    events.append((now, kind, target))
+    events[:] = [event for event in events if now - event[0] <= ANTI_NUKE_WINDOW_SECONDS]
+    if len(events) < ANTI_NUKE_DELETE_THRESHOLD or key in _active_incidents:
+        return
+
+    _active_incidents.add(key)
+    try:
+        member = guild.get_member(executor.id)
+        kicked = False
+        if member is not None and guild.me and guild.me.guild_permissions.kick_members:
+            try:
+                await member.kick(reason=f"BLOODFANG Anti-Nuke: {len(events)} channel/role deletions in {ANTI_NUKE_WINDOW_SECONDS}s")
+                kicked = True
+            except (discord.Forbidden, discord.HTTPException):
+                log.exception("Could not kick suspected mass deleter %s", executor.id)
+
+        restored_lines = []
+        seen = set()
+        for _, event_kind, snapshot in reversed(events):
+            item_key = (event_kind, snapshot.id)
+            if item_key in seen:
+                continue
+            seen.add(item_key)
+            restored = (await _restore_deleted_channel(guild, snapshot)
+                        if event_kind == "channel" else await _restore_deleted_role(guild, snapshot))
+            if restored is not None:
+                restored_lines.append(f"Restored {event_kind}: {restored.name} (ID {restored.id})")
+            else:
+                restored_lines.append(f"Could not restore {event_kind}: {getattr(snapshot, 'name', 'unknown')}")
+
+        action_text = "Kicked successfully" if kicked else "Kick failed (permissions, role hierarchy, or member unavailable)"
+        await _security_log(
+            guild, "🚨 ANTI-NUKE: Mass deletion detected",
+            f"Executor: {executor} (ID {executor.id})\nAction: {action_text}\n"
+            f"Deletions: {len(events)} within {ANTI_NUKE_WINDOW_SECONDS}s\n\n" + "\n".join(restored_lines),
+            discord.Color.red())
+    finally:
+        _active_incidents.discard(key)
+        _delete_events.pop(key, None)
+
+
+@bot.event
+async def on_guild_channel_delete(channel):
+    await _handle_delete_event(channel.guild, channel, "channel", discord.AuditLogAction.channel_delete)
+
+
+@bot.event
+async def on_guild_role_delete(role):
+    await _handle_delete_event(role.guild, role, "role", discord.AuditLogAction.role_delete)
+
+
 @bot.event
 async def on_ready():
     # Apply the first status immediately, then switch to the other every 2 minutes.
