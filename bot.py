@@ -27,37 +27,37 @@ bot = commands.Bot(command_prefix=[".", "!"], intents=intents, status=discord.St
 async def help_command(ctx):
     """Show all available BLOODFANG bot commands."""
     embed = discord.Embed(
-        title="🩸 BLOODFANG Bot — Hilfe",
-        description="Hier findest du alle verfügbaren Befehle. Prefixe: `!` oder `.`",
+        title="🩸 BLOODFANG Bot — Help",
+        description="Here are all available commands. Prefixes: `!` or `.`",
         color=discord.Color.dark_red(),
     )
     embed.add_field(
         name="💰 Economy",
         value=(
-            "`!balance` / `!bal` / `!konto` [@User] — Kontostand anzeigen\n"
-            "`!work` / `!w` — Coins verdienen (3 Stunden Cooldown)\n"
-            "`!crime` / `!c` — Verbrechen versuchen (3 Stunden Cooldown)\n"
-            "`!cheat` — Coins gewinnen oder verlieren (3 Stunden Cooldown)\n"
-            "`!pay` / `!transfer` @User Betrag — Coins überweisen"
+            "`!balance` / `!bal` [@User] — Show your balance\n"
+            "`!work` / `!w` — Earn Coins (3-hour cooldown)\n"
+            "`!crime` / `!c` — Attempt a crime (3-hour cooldown)\n"
+            "`!cheat` — Win or lose Coins (3-hour cooldown)\n"
+            "`!pay` / `!transfer` @User amount — Transfer Coins"
         ),
         inline=False,
     )
     embed.add_field(
         name="🩸 Shop & Mitgliedschaft",
         value=(
-            "`!membership` — Mitgliedschafts-Ränge und Preise per DM\n"
-            "`!pointshop` — Points-Pakete und Preise per DM\n"
-            "`!donat` — Donation-Ränge und Storage-Boni per DM\n"
+            "`!membership` — Membership ranks and prices via DM\n"
+            "`!pointshop` — Points packages and prices via DM\n"
+            "`!donat` — Donation ranks and storage bonuses via DM\n"
             "`/mymembership` — Eigene Mitgliedschaft prüfen"
         ),
         inline=False,
     )
     embed.add_field(
         name="🛠️ Administration",
-        value="`/shoplog` — Shop-Log-Webhook einrichten (Berechtigung: Server verwalten)",
+        value="`/shoplog` — Set up the shop log webhook (requires Manage Server permission)",
         inline=False,
     )
-    embed.set_footer(text="Bei Fragen oder Problemen wende dich an das BLOODFANG-Team.")
+    embed.set_footer(text="For help or issues, contact the BLOODFANG team.")
     await ctx.send(embed=embed)
 
 STATUS_ACTIVITIES = [
@@ -147,8 +147,7 @@ async def balance(ctx, member: discord.Member = None):
     amount = get_balance(member.id)
     embed = discord.Embed(title="🏦 Balance",
         description=f"**Player:** {member.mention}\n**Balance:** **{amount:,} Coins**".replace(",", "."),
-        color=discord.Color.gold())
-    embed.set_thumbnail(url=member.display_avatar.url)
+        color=discord.Color.gold())    embed.set_thumbnail(url=member.display_avatar.url)
     await ctx.send(embed=embed)
 
 
@@ -297,8 +296,7 @@ async def donation_ranks(ctx):
         ("🟢 Emerald — €150–199", "Total storage bonus: **+8 slots**"),
         ("🔴 Ruby — €200–299", "Total storage bonus: **+9 slots**"),
         ("⚫ Obsidian — €300–499", "Total storage bonus: **+10 slots**"),
-        ("🟣 Amethyst — €500–749", "Total storage bonus: **+12 slots**"),
-        ("🌑 Dark Matter — €750–999", "Total storage bonus: **+14 slots**"),
+        ("🟣 Amethyst — €500–749", "Total storage bonus: **+12 slots**"),        ("🌑 Dark Matter — €750–999", "Total storage bonus: **+14 slots**"),
         ("👑 Blood God — €1,000+", "Total storage bonus: **+16 slots**\n**Extra reward:** Ticket priority."),
     ]
     await send_offer_dm(
@@ -448,7 +446,6 @@ async def shoplog(interaction: discord.Interaction):
         ephemeral=True,
     )
 
-
 DONATION_ROLES = [
     ("💸 Donator", "#95A5A6", ["Donator", "🩸 Donator"]),
     ("🥉 Bronze", "#CD7F32", ["Bronze", "🩸 Bronze"]),
@@ -597,8 +594,7 @@ async def _restore_deleted_channel(guild, snapshot):
         return None
 
 
-async def _restore_deleted_role(guild, snapshot):
-    try:
+async def _restore_deleted_role(guild, snapshot):    try:
         if snapshot.is_default() or snapshot.managed:
             return None
         return await guild.create_role(
@@ -705,7 +701,7 @@ async def update_donation_leaderboard():
             ("⚫ Obsidian", "€300–499", "+10 Slots"),
             ("🟣 Amethyst", "€500–749", "+12 Slots"),
             ("🌑 Dark Matter", "€750–999", "+14 Slots"),
-            ("👑 Blood God", "€1.000+", "+16 Slots + Ticket-Priorität"),
+            ("👑 Blood God", "€1,000+", "+16 slots + ticket priority"),
         ]
         ranks_text = "\n".join(f"{name} — **{price}** → {bonus}" for name, price, bonus in rank_rows)
 
@@ -739,17 +735,17 @@ async def update_donation_leaderboard():
                 donor_lines.append(f"{medals[index]} **{name}** — €{int(donor['total_cents']) / 100:,.2f}")
             top_text = "\n".join(donor_lines)
         else:
-            top_text = "Noch keine bestätigten Spenden. Sei der erste BLOODFANG Donator!"
+            top_text = "No confirmed donations yet. Be the first BLOODFANG donor!"
 
         ranks_embed = discord.Embed(
             title="🩸 BLOODFANG Donation Ranks",
-            description="Dein bestätigter Lifetime-Spendenbetrag bestimmt deinen Rang. Storage-Boni sind Gesamtboni.",
+            description="Your confirmed lifetime donation total determines your rank. Storage bonuses are total bonuses, not cumulative rank-by-rank.",
             color=discord.Color.dark_red(),
         )
-        ranks_embed.add_field(name="Rang • Spendenbetrag • Belohnung", value=ranks_text, inline=False)
+        ranks_embed.add_field(name="Rank • Donation Total • Reward", value=ranks_text, inline=False)
         ranks_embed.set_footer(text="Automatische Aktualisierung alle 10 Minuten")
         top_embed = discord.Embed(title="🏆 Top 5 Donators", description=top_text, color=discord.Color.gold())
-        top_embed.set_footer(text="Sortiert nach bestätigten Lifetime-Spenden • Anonyme Spenden werden nicht namentlich angezeigt")
+        top_embed.set_footer(text="Ranked by confirmed lifetime donations • Anonymous donations are not shown by name")
 
         message = None
         if message_id:
@@ -797,8 +793,7 @@ async def on_ready():
         if live_guild is not None:
             await ensure_donation_roles(live_guild)
         else:
-            log.error("Configured Discord guild %s is not available to the bot", guild_id)
-        guild = discord.Object(id=guild_id)
+            log.error("Configured Discord guild %s is not available to the bot", guild_id)        guild = discord.Object(id=guild_id)
         bot.tree.copy_global_to(guild=guild)
         synced = await bot.tree.sync(guild=guild)
         log.info("Synced %s guild slash commands for guild %s", len(synced), guild_id)
