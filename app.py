@@ -409,16 +409,17 @@ async def assign_donation_rank(user_id, total_cents):
             member = await response.json()
         current_ids = set(member.get("roles", []))
 
-        # Donors also receive the ticket-priority role after a confirmed donation.
-        # This role is independent of the donation-rank roles and is not removed on rank-up.
+        # The Blood God role is also the ticket-priority role. Only grant it
+        # when the confirmed lifetime donation total reaches €1,000.
         ticket_priority_role_id = "1565090381178077368"
-        ticket_priority_role = next((r for r in roles if r.get("id") == ticket_priority_role_id), None)
-        if ticket_priority_role is None:
-            raise RuntimeError(f"Ticket-priority role {ticket_priority_role_id} was not found in the Discord server.")
-        if ticket_priority_role_id not in current_ids:
-            async with client.put(f"{member_url}/roles/{ticket_priority_role_id}", headers=headers, json={}) as response:
-                if response.status not in (200, 204):
-                    raise RuntimeError(f"Discord could not assign ticket-priority role (HTTP {response.status})")
+        if int(total_cents) >= 100000:
+            ticket_priority_role = next((r for r in roles if r.get("id") == ticket_priority_role_id), None)
+            if ticket_priority_role is None:
+                raise RuntimeError(f"Blood God / ticket-priority role {ticket_priority_role_id} was not found in the Discord server.")
+            if ticket_priority_role_id not in current_ids:
+                async with client.put(f"{member_url}/roles/{ticket_priority_role_id}", headers=headers, json={}) as response:
+                    if response.status not in (200, 204):
+                        raise RuntimeError(f"Discord could not assign Blood God / ticket-priority role (HTTP {response.status})")
 
         donation_names = [name for _, name in reversed(DONATION_RANKS)]
         for role in roles:
