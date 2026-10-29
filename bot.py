@@ -298,7 +298,7 @@ async def donation_ranks(ctx):
         ("🔴 Ruby — €200–299", "Total storage bonus: **+9 slots**"),
         ("⚫ Obsidian — €300–499", "Total storage bonus: **+10 slots**"),
         ("🟣 Amethyst — €500–749", "Total storage bonus: **+12 slots**"),
-        ("🌑 Dark Matter — €750–999", "Total storage bonus: **+14 slots**),
+        ("🌑 Dark Matter — €750–999", "Total storage bonus: **+14 slots**"),
         ("👑 Blood God — €1,000+", "Total storage bonus: **+16 slots**\n**Extra reward:** Ticket priority."),
     ]
     await send_offer_dm(
