@@ -884,12 +884,8 @@ init_db()
 _scheduler = BackgroundScheduler(daemon=True)
 _scheduler.add_job(expire_memberships, "interval", minutes=5, id="expire_memberships", max_instances=1, replace_existing=True)
 _scheduler.add_job(send_expiry_reminders, "interval", minutes=15, id="send_expiry_reminders", max_instances=1, replace_existing=True)
-_scheduler.add_job(update_donation_leaderboard, "interval", minutes=10, id="donation_leaderboard", max_instances=1, replace_existing=True)
+# The Discord bot now owns leaderboard publishing; the website only records donations.
 _scheduler.start()
-try:
-    update_donation_leaderboard()
-except Exception:
-    app.logger.exception("Initial donation leaderboard publish failed")
 @app.get("/logout")
 def logout():
     session.clear()
