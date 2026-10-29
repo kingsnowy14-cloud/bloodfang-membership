@@ -676,6 +676,110 @@ async def on_guild_role_delete(role):
     await _handle_delete_event(role.guild, role, "role", discord.AuditLogAction.role_delete)
 
 
+DONATION_CHANNEL_ID = os.environ.get("DONATION_CHANNEL_ID", "1565085512539185152").strip()
+MEMBERSHIP_DB_PATH = os.environ.get("MEMBERSHIP_DB_PATH", "/data/membership.sqlite3")
+DONATION_LEADERBOARD_SETTING = "donation_leaderboard_message_id"
+
+
+@tasks.loop(minutes=10)
+async def update_donation_leaderboard():
+    """Publish/edit the donation leaderboard directly through discord.py."""
+    if not DONATION_CHANNEL_ID:
+        log.error("Donation leaderboard skipped: DONATION_CHANNEL_ID is empty")
+        return
+    try:
+        channel = bot.get_channel(int(DONATION_CHANNEL_ID))
+        if channel is None:
+            channel = await bot.fetch_channel(int(DONATION_CHANNEL_ID))
+
+        rank_rows = [
+            ("🩸 Donator", "€1–5", "+1 Slot"),
+            ("🥉 Bronze", "€6–14", "+2 Slots"),
+            ("🥈 Silver", "€15–24", "+3 Slots"),
+            ("🥇 Gold", "€25–49", "+4 Slots"),
+            ("💎 Platinum", "€50–74", "+5 Slots"),
+            ("💠 Diamond", "€75–99", "+6 Slots"),
+            ("🔷 Sapphire", "€100–149", "+7 Slots"),
+            ("🟢 Emerald", "€150–199", "+8 Slots"),
+            ("🔴 Ruby", "€200–299", "+9 Slots"),
+            ("⚫ Obsidian", "€300–499", "+10 Slots"),
+            ("🟣 Amethyst", "€500–749", "+12 Slots"),
+            ("🌑 Dark Matter", "€750–999", "+14 Slots"),
+            ("👑 Blood God", "€1.000+", "+16 Slots + Ticket-Priorität"),
+        ]
+        ranks_text = "\n".join(f"{name} — **{price}** → {bonus}" for name, price, bonus in rank_rows)
+
+        db_dir = os.path.dirname(os.path.abspath(MEMBERSHIP_DB_PATH))
+        os.makedirs(db_dir, exist_ok=True)
+        with sqlite3.connect(MEMBERSHIP_DB_PATH, timeout=15) as db:
+            db.row_factory = sqlite3.Row
+            db.execute("CREATE TABLE IF NOT EXISTS app_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)")
+            db.execute("""CREATE TABLE IF NOT EXISTS donations (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                paypal_capture_id TEXT NOT NULL UNIQUE,
+                user_id TEXT NOT NULL,
+                display_name TEXT NOT NULL,
+                amount_cents INTEGER NOT NULL,
+                anonymous INTEGER NOT NULL DEFAULT 0,
+                created_at INTEGER NOT NULL
+            )""")
+            donors = db.execute(
+                """SELECT user_id, display_name, SUM(amount_cents) AS total_cents
+                   FROM donations GROUP BY user_id
+                   ORDER BY total_cents DESC, MIN(created_at) ASC LIMIT 5"""
+            ).fetchall()
+            setting = db.execute("SELECT value FROM app_settings WHERE key=?", (DONATION_LEADERBOARD_SETTING,)).fetchone()
+            message_id = setting["value"] if setting else None
+
+        if donors:
+            medals = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣"]
+            donor_lines = []
+            for index, donor in enumerate(donors):
+                name = "Anonymous Donator" if donor["display_name"] == "__anonymous__" else str(donor["display_name"])[:80]
+                donor_lines.append(f"{medals[index]} **{name}** — €{int(donor['total_cents']) / 100:,.2f}")
+            top_text = "\n".join(donor_lines)
+        else:
+            top_text = "Noch keine bestätigten Spenden. Sei der erste BLOODFANG Donator!"
+
+        ranks_embed = discord.Embed(
+            title="🩸 BLOODFANG Donation Ranks",
+            description="Dein bestätigter Lifetime-Spendenbetrag bestimmt deinen Rang. Storage-Boni sind Gesamtboni.",
+            color=discord.Color.dark_red(),
+        )
+        ranks_embed.add_field(name="Rang • Spendenbetrag • Belohnung", value=ranks_text, inline=False)
+        ranks_embed.set_footer(text="Automatische Aktualisierung alle 10 Minuten")
+        top_embed = discord.Embed(title="🏆 Top 5 Donators", description=top_text, color=discord.Color.gold())
+        top_embed.set_footer(text="Sortiert nach bestätigten Lifetime-Spenden • Anonyme Spenden werden nicht namentlich angezeigt")
+
+        message = None
+        if message_id:
+            try:
+                message = await channel.fetch_message(int(message_id))
+            except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                log.warning("Could not fetch saved donation leaderboard message; creating a replacement")
+
+        if message is None:
+            message = await channel.send(embeds=[ranks_embed, top_embed], allowed_mentions=discord.AllowedMentions.none())
+            log.info("Created donation leaderboard message %s in channel %s", message.id, DONATION_CHANNEL_ID)
+        else:
+            await message.edit(embeds=[ranks_embed, top_embed], allowed_mentions=discord.AllowedMentions.none())
+            log.info("Updated donation leaderboard message %s", message.id)
+
+        with sqlite3.connect(MEMBERSHIP_DB_PATH, timeout=15) as db:
+            db.execute(
+                """INSERT INTO app_settings(key,value) VALUES(?,?)
+                   ON CONFLICT(key) DO UPDATE SET value=excluded.value""",
+                (DONATION_LEADERBOARD_SETTING, str(message.id)),
+            )
+    except Exception:
+        log.exception("Bot could not publish/update donation leaderboard")
+
+
+@update_donation_leaderboard.before_loop
+async def before_donation_leaderboard():
+    await bot.wait_until_ready()
+
+
 @bot.event
 async def on_ready():
     # Apply the first status immediately, then switch to the other every 2 minutes.
@@ -685,6 +789,8 @@ async def on_ready():
     )
     if not rotate_status.is_running():
         rotate_status.start()
+    if not update_donation_leaderboard.is_running():
+        update_donation_leaderboard.start()
     try:
         guild_id = int(os.environ.get("DISCORD_GUILD_ID", "1561027077984227371"))
         live_guild = bot.get_guild(guild_id)
