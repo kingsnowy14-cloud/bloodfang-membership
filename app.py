@@ -29,6 +29,7 @@ TIERS = [
 ]
 
 POINT_PACKAGES = [
+    {"points":"750.000","price":"5,00","featured":False},
     {"points":"2.500.000","price":"10,00","featured":False},
     {"points":"6.500.000","price":"25,00","featured":False},
     {"points":"16.500.000","price":"55,00","featured":True},
