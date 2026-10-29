@@ -446,6 +446,108 @@ async def assign_donation_rank(user_id, total_cents):
     return rank_name
 
 
+
+DONATION_CHANNEL_ID = os.environ.get("DONATION_CHANNEL_ID", "1565085512539185152").strip()
+DONATION_LEADERBOARD_SETTING = "donation_leaderboard_message_id"
+
+
+def _discord_api(method, path, payload=None):
+    if not DISCORD_BOT_TOKEN:
+        raise RuntimeError("DISCORD_BOT_TOKEN is missing; cannot publish the donation leaderboard.")
+    request = urllib.request.Request(
+        "https://discord.com/api/v10" + path,
+        data=json.dumps(payload).encode("utf-8") if payload is not None else None,
+        headers={"Authorization": "Bot " + DISCORD_BOT_TOKEN, "Content-Type": "application/json"},
+        method=method,
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=12) as response:
+            body = response.read()
+            return json.loads(body.decode("utf-8")) if body else {}
+    except Exception:
+        app.logger.exception("Discord donation leaderboard API request failed")
+        raise
+
+
+def _donation_leaderboard_payload():
+    rank_rows = [
+        ("🩸 Donator", "€1–5", "+1 Slot"),
+        ("🥉 Bronze", "€6–14", "+2 Slots"),
+        ("🥈 Silver", "€15–24", "+3 Slots"),
+        ("🥇 Gold", "€25–49", "+4 Slots"),
+        ("💎 Platinum", "€50–74", "+5 Slots"),
+        ("💠 Diamond", "€75–99", "+6 Slots"),
+        ("🔷 Sapphire", "€100–149", "+7 Slots"),
+        ("🟢 Emerald", "€150–199", "+8 Slots"),
+        ("🔴 Ruby", "€200–299", "+9 Slots"),
+        ("⚫ Obsidian", "€300–499", "+10 Slots"),
+        ("🟣 Amethyst", "€500–749", "+12 Slots"),
+        ("🌑 Dark Matter", "€750–999", "+14 Slots"),
+        ("👑 Blood God", "€1.000+", "+16 Slots + Ticket-Priorität"),
+    ]
+    ranks_text = "\\n".join(f"{name} — **{price}** → {bonus}" for name, price, bonus in rank_rows)
+    with db_connect() as db:
+        donors = db.execute(
+            """SELECT user_id, display_name, SUM(amount_cents) AS total_cents
+               FROM donations GROUP BY user_id
+               ORDER BY total_cents DESC, MIN(created_at) ASC LIMIT 5"""
+        ).fetchall()
+    if donors:
+        donor_lines = []
+        medals = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣"]
+        for index, donor in enumerate(donors):
+            name = "Anonymous Donator" if donor["display_name"] == "__anonymous__" else str(donor["display_name"])[:80]
+            donor_lines.append(f"{medals[index]} **{name}** — €{int(donor['total_cents']) / 100:,.2f}")
+        top_text = "\\n".join(donor_lines)
+    else:
+        top_text = "Noch keine bestätigten Spenden. Sei der erste BLOODFANG Donator!"
+    return {
+        "embeds": [
+            {
+                "title": "🩸 BLOODFANG Donation Ranks",
+                "description": "Dein bestätigter Lifetime-Spendenbetrag bestimmt deinen Rang. Storage-Boni sind Gesamtboni.",
+                "color": 10027008,
+                "fields": [{"name": "Rang • Spendenbetrag • Belohnung", "value": ranks_text, "inline": False}],
+                "footer": {"text": "Automatische Aktualisierung alle 10 Minuten"},
+            },
+            {
+                "title": "🏆 Top 5 Donators",
+                "description": top_text,
+                "color": 16766720,
+                "footer": {"text": "Sortiert nach bestätigten Lifetime-Spenden • Anonyme Spenden werden nicht namentlich angezeigt"},
+            },
+        ],
+        "allowed_mentions": {"parse": []},
+    }
+
+
+def update_donation_leaderboard():
+    """Create the channel leaderboard once, then edit the same Discord message every 10 minutes."""
+    if not DONATION_CHANNEL_ID or not DISCORD_BOT_TOKEN:
+        app.logger.warning("Donation leaderboard skipped: DONATION_CHANNEL_ID or DISCORD_BOT_TOKEN is missing")
+        return
+    payload = _donation_leaderboard_payload()
+    with db_connect() as db:
+        row = db.execute("SELECT value FROM app_settings WHERE key=?", (DONATION_LEADERBOARD_SETTING,)).fetchone()
+    message_id = row["value"] if row else None
+    if message_id:
+        try:
+            _discord_api("PATCH", f"/channels/{DONATION_CHANNEL_ID}/messages/{message_id}", payload)
+            app.logger.info("Updated donation leaderboard message %s", message_id)
+            return
+        except Exception:
+            app.logger.warning("Could not edit saved donation leaderboard message; creating a replacement")
+    message = _discord_api("POST", f"/channels/{DONATION_CHANNEL_ID}/messages", payload)
+    new_message_id = str(message["id"])
+    with db_connect() as db:
+        db.execute(
+            """INSERT INTO app_settings(key,value) VALUES(?,?)
+               ON CONFLICT(key) DO UPDATE SET value=excluded.value""",
+            (DONATION_LEADERBOARD_SETTING, new_message_id),
+        )
+    app.logger.info("Created donation leaderboard message %s in channel %s", new_message_id, DONATION_CHANNEL_ID)
+
+
 def record_confirmed_donation(capture_id, user_id, display_name, amount_cents, anonymous=False):
     if not capture_id or not str(user_id).isdigit() or amount_cents < 100:
         raise RuntimeError("Confirmed PayPal donation is missing valid capture details.")
@@ -766,7 +868,12 @@ init_db()
 _scheduler = BackgroundScheduler(daemon=True)
 _scheduler.add_job(expire_memberships, "interval", minutes=5, id="expire_memberships", max_instances=1, replace_existing=True)
 _scheduler.add_job(send_expiry_reminders, "interval", minutes=15, id="send_expiry_reminders", max_instances=1, replace_existing=True)
+_scheduler.add_job(update_donation_leaderboard, "interval", minutes=10, id="donation_leaderboard", max_instances=1, replace_existing=True, next_run_time=None)
 _scheduler.start()
+try:
+    update_donation_leaderboard()
+except Exception:
+    app.logger.exception("Initial donation leaderboard publish failed")
 @app.get("/logout")
 def logout():
     session.clear()
