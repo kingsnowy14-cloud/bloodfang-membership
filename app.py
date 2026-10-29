@@ -464,6 +464,18 @@ def _discord_api(method, path, payload=None):
         with urllib.request.urlopen(request, timeout=12) as response:
             body = response.read()
             return json.loads(body.decode("utf-8")) if body else {}
+    except urllib.error.HTTPError as exc:
+        # Discord returns a useful JSON error body (e.g. Missing Access, Missing Permissions,
+        # Invalid Form Body). Log it so Railway logs reveal why the message was not sent.
+        try:
+            detail = exc.read().decode("utf-8", errors="replace")
+        except Exception:
+            detail = ""
+        app.logger.error(
+            "Discord donation leaderboard API rejected %s %s: HTTP %s; response=%s",
+            method, path, exc.code, detail[:2000]
+        )
+        raise
     except Exception:
         app.logger.exception("Discord donation leaderboard API request failed")
         raise
