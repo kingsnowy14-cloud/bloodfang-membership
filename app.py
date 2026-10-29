@@ -524,8 +524,12 @@ def _donation_leaderboard_payload():
 def update_donation_leaderboard():
     """Create the channel leaderboard once, then edit the same Discord message every 10 minutes."""
     if not DONATION_CHANNEL_ID or not DISCORD_BOT_TOKEN:
-        app.logger.warning("Donation leaderboard skipped: DONATION_CHANNEL_ID or DISCORD_BOT_TOKEN is missing")
+        app.logger.error(
+            "Donation leaderboard skipped: missing configuration (channel_configured=%s, bot_token_configured=%s)",
+            bool(DONATION_CHANNEL_ID), bool(DISCORD_BOT_TOKEN)
+        )
         return
+    app.logger.info("Publishing donation leaderboard to Discord channel %s", DONATION_CHANNEL_ID)
     payload = _donation_leaderboard_payload()
     with db_connect() as db:
         row = db.execute("SELECT value FROM app_settings WHERE key=?", (DONATION_LEADERBOARD_SETTING,)).fetchone()
@@ -868,7 +872,7 @@ init_db()
 _scheduler = BackgroundScheduler(daemon=True)
 _scheduler.add_job(expire_memberships, "interval", minutes=5, id="expire_memberships", max_instances=1, replace_existing=True)
 _scheduler.add_job(send_expiry_reminders, "interval", minutes=15, id="send_expiry_reminders", max_instances=1, replace_existing=True)
-_scheduler.add_job(update_donation_leaderboard, "interval", minutes=10, id="donation_leaderboard", max_instances=1, replace_existing=True, next_run_time=None)
+_scheduler.add_job(update_donation_leaderboard, "interval", minutes=10, id="donation_leaderboard", max_instances=1, replace_existing=True)
 _scheduler.start()
 try:
     update_donation_leaderboard()
