@@ -376,11 +376,21 @@ async def create_paypal_donation(user_id, amount, display_name, anonymous):
             return next(link["href"] for link in data["links"] if link["rel"] == "approve")
 
 
+# Lifetime donation thresholds in cents, ordered highest first.
 DONATION_RANKS = [
-    (100000, "👑 Blood God"), (75000, "🌌 Dark Matter"), (50000, "🟣 Amethyst"),
-    (30000, "⚫ Obsidian"), (20000, "❤️ Ruby"), (15000, "🟢 Emerald"),
-    (10000, "🔹 Sapphire"), (7500, "💠 Diamond"), (5000, "💎 Platinum"),
-    (2500, "🥇 Gold"), (1500, "🥈 Silver"), (600, "🥉 Bronze"), (100, "💸 Donator"),
+    (100000, "👑 Blood God"),
+    (75000, "🌑 Dark Matter"),
+    (50000, "🟣 Amethyst"),
+    (30000, "⚫ Obsidian"),
+    (20000, "🔴 Ruby"),
+    (15000, "🟢 Emerald"),
+    (10000, "🔷 Sapphire"),
+    (7500, "💠 Diamond"),
+    (5000, "💎 Platinum"),
+    (2500, "🥇 Gold"),
+    (1500, "🥈 Silver"),
+    (600, "🥉 Bronze"),
+    (100, "🩸 Donator"),
 ]
 
 
