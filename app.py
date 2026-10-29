@@ -17,6 +17,7 @@ DISCORD_REDIRECT_URI = os.environ.get("DISCORD_REDIRECT_URI", "")
 PUBLIC_BASE_URL = os.environ.get("PUBLIC_BASE_URL", "").rstrip("/")
 DISCORD_BOT_TOKEN = os.environ.get("DISCORD_BOT_TOKEN", "")
 DISCORD_GUILD_ID = os.environ.get("DISCORD_GUILD_ID", "1561027077984227371")
+DISCORD_NOTIFICATION_USER_ID = os.environ.get("DISCORD_NOTIFICATION_USER_ID", "1493110334280564807").strip()
 ENABLE_TEST_PURCHASES = os.environ.get("ENABLE_TEST_PURCHASES", "false").lower() == "true"
 
 TIERS = [
@@ -261,6 +262,33 @@ def init_db():
         )""")
 
 
+async def send_discord_dm(user_id, message):
+    """Send a private Discord message through the configured bot."""
+    if not DISCORD_BOT_TOKEN or not user_id:
+        app.logger.warning("Discord DM skipped: bot token or recipient ID missing")
+        return False
+    headers = {"Authorization": f"Bot {DISCORD_BOT_TOKEN}", "Content-Type": "application/json"}
+    base = "https://discord.com/api/v10"
+    async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=12)) as client:
+        async with client.post(f"{base}/users/@me/channels", headers=headers, json={"recipient_id": str(user_id)}) as response:
+            if response.status not in (200, 201):
+                app.logger.error("Could not open Discord DM (HTTP %s)", response.status)
+                return False
+            channel = await response.json()
+        async with client.post(f"{base}/channels/{channel['id']}/messages", headers=headers, json={"content": message}) as response:
+            if response.status not in (200, 201):
+                app.logger.error("Could not send Discord DM (HTTP %s)", response.status)
+                return False
+    return True
+
+
+def send_discord_dm_background(user_id, message):
+    try:
+        asyncio.run(send_discord_dm(str(user_id), message))
+    except Exception:
+        app.logger.exception("Discord DM notification failed")
+
+
 def save_purchase(user_id, tier_name, provider_ref, purchase_type, expires_at, provider, email=None):
     now = int(time.time())
     with db_connect() as db:
@@ -280,6 +308,16 @@ def save_purchase(user_id, tier_name, provider_ref, purchase_type, expires_at, p
             provider_ref=str(provider_ref),
             expires_at=expires_at,
             status="Paid / active",
+        )
+        tier = next((item for item in TIERS if item["name"].casefold() == tier_name.casefold()), None)
+        price = f"€{tier['price']}" if tier else "See PayPal receipt"
+        send_discord_dm_background(
+            str(user_id),
+            f"✅ **BLOODFANG Purchase Successful**\\n\\n"
+            f"**Item:** {tier_name} Membership ({purchase_type.replace('_', ' ').title()})\\n"
+            f"**Price:** {price}\\n"
+            f"**Payment:** {provider.title()}\\n\\n"
+            "Thank you for your purchase! Your membership is now active."
         )
 
 
@@ -572,9 +610,18 @@ def record_confirmed_donation(capture_id, user_id, display_name, amount_cents, a
     if not capture_id or not str(user_id).isdigit() or amount_cents < 100:
         raise RuntimeError("Confirmed PayPal donation is missing valid capture details.")
     with db_connect() as db:
-        db.execute("INSERT OR IGNORE INTO donations(paypal_capture_id,user_id,display_name,amount_cents,anonymous,created_at) VALUES(?,?,?,?,?,?)",
+        cursor = db.execute("INSERT OR IGNORE INTO donations(paypal_capture_id,user_id,display_name,amount_cents,anonymous,created_at) VALUES(?,?,?,?,?,?)",
                    (str(capture_id), str(user_id), "__anonymous__" if anonymous else str(display_name)[:100], int(amount_cents), int(bool(anonymous)), int(time.time())))
+        is_new_donation = cursor.rowcount == 1
         total = db.execute("SELECT COALESCE(SUM(amount_cents),0) AS total FROM donations WHERE user_id=?", (str(user_id),)).fetchone()["total"]
+    if is_new_donation:
+        send_discord_dm_background(
+            str(user_id),
+            "✅ **BLOODFANG Donation Successful**\\n\\n"
+            f"**Amount:** €{int(amount_cents) / 100:.2f}\\n"
+            "**Payment:** PayPal\\n\\n"
+            "Thank you for supporting BLOODFANG!"
+        )
     import asyncio
     rank = asyncio.run(assign_donation_rank(str(user_id), int(total)))
     return rank, int(total)
