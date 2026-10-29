@@ -299,12 +299,12 @@ async def donation_ranks(ctx):
         ("⚫ Obsidian — €300–499", "Total storage bonus: **+10 slots**"),
         ("🟣 Amethyst — €500–749", "Total storage bonus: **+12 slots**"),
         ("🌑 Dark Matter — €750–999", "Total storage bonus: **+14 slots**"),
-        ("👑 Blood God — €1,000+", "Total storage bonus: **+16 slots**"),
+        ("👑 Blood God — €1,000+", "Total storage bonus: **+16 slots**\n**Extra reward:** Ticket priority."),
     ]
     await send_offer_dm(
         ctx,
         "BLOODFANG Donation Ranks",
-        "Your lifetime confirmed donation total determines your rank. Storage bonuses are total bonuses added to your existing membership storage; they are not stacked again at every rank-up.",
+        "Your lifetime confirmed donation total determines your rank. Storage bonuses are total bonuses added to your existing membership storage; they are not stacked again at every rank-up. Blood God also receives ticket priority from €1,000.",
         fields,
         "Donate through the official BLOODFANG website: " + os.environ.get("PUBLIC_BASE_URL", "https://bloodfang-membership.up.railway.app").rstrip("/") + "/donate",
     )
@@ -456,12 +456,12 @@ DONATION_ROLES = [
     ("🥇 Gold", "#FFD700", ["Gold", "🩸 Gold"]),
     ("💎 Platinum", "#7FDBFF", ["Platinum", "🩸 Platinum"]),
     ("💠 Diamond", "#00BFFF", ["Diamond", "🩸 Diamond"]),
-    ("🔹 Sapphire", "#0F52BA", ["Sapphire", "🩸 Sapphire"]),
+    ("🔷 Sapphire", "#0F52BA", ["Sapphire", "🔹 Sapphire", "🩸 Sapphire"]),
     ("🟢 Emerald", "#50C878", ["Emerald", "🩸 Emerald"]),
-    ("❤️ Ruby", "#E0115F", ["Ruby", "🩸 Ruby"]),
+    ("🔴 Ruby", "#E0115F", ["Ruby", "❤️ Ruby", "🩸 Ruby"]),
     ("⚫ Obsidian", "#343434", ["Obsidian", "🩸 Obsidian"]),
     ("🟣 Amethyst", "#9966CC", ["Amethyst", "🩸 Amethyst"]),
-    ("🌌 Dark Matter", "#301934", ["Dark Matter", "🩸 Dark Matter"]),
+    ("🌑 Dark Matter", "#301934", ["Dark Matter", "🌌 Dark Matter", "🩸 Dark Matter"]),
     ("👑 Blood God", "#8B0000", ["Blood God", "🩸 Blood God"]),
 ]
 
