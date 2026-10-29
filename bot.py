@@ -43,12 +43,12 @@ async def help_command(ctx):
         inline=False,
     )
     embed.add_field(
-        name="🩸 Shop & Mitgliedschaft",
+        name="🩸 Shop & Membership",
         value=(
             "`!membership` — Membership ranks and prices via DM\n"
             "`!pointshop` — Points packages and prices via DM\n"
             "`!donat` — Donation ranks and storage bonuses via DM\n"
-            "`/mymembership` — Eigene Mitgliedschaft prüfen"
+            "`/mymembership` — Check your membership"
         ),
         inline=False,
     )
@@ -147,7 +147,8 @@ async def balance(ctx, member: discord.Member = None):
     amount = get_balance(member.id)
     embed = discord.Embed(title="🏦 Balance",
         description=f"**Player:** {member.mention}\n**Balance:** **{amount:,} Coins**".replace(",", "."),
-        color=discord.Color.gold())    embed.set_thumbnail(url=member.display_avatar.url)
+        color=discord.Color.gold())
+    embed.set_thumbnail(url=member.display_avatar.url)
     await ctx.send(embed=embed)
 
 
@@ -296,7 +297,8 @@ async def donation_ranks(ctx):
         ("🟢 Emerald — €150–199", "Total storage bonus: **+8 slots**"),
         ("🔴 Ruby — €200–299", "Total storage bonus: **+9 slots**"),
         ("⚫ Obsidian — €300–499", "Total storage bonus: **+10 slots**"),
-        ("🟣 Amethyst — €500–749", "Total storage bonus: **+12 slots**"),        ("🌑 Dark Matter — €750–999", "Total storage bonus: **+14 slots**"),
+        ("🟣 Amethyst — €500–749", "Total storage bonus: **+12 slots**"),
+        ("🌑 Dark Matter — €750–999", "Total storage bonus: **+14 slots**),
         ("👑 Blood God — €1,000+", "Total storage bonus: **+16 slots**\n**Extra reward:** Ticket priority."),
     ]
     await send_offer_dm(
@@ -594,7 +596,8 @@ async def _restore_deleted_channel(guild, snapshot):
         return None
 
 
-async def _restore_deleted_role(guild, snapshot):    try:
+async def _restore_deleted_role(guild, snapshot):
+    try:
         if snapshot.is_default() or snapshot.managed:
             return None
         return await guild.create_role(
@@ -677,7 +680,7 @@ MEMBERSHIP_DB_PATH = os.environ.get("MEMBERSHIP_DB_PATH", "/data/membership.sqli
 DONATION_LEADERBOARD_SETTING = "donation_leaderboard_message_id"
 
 
-@tasks.loop(minutes=10)
+@tasks.loop(minutes=3)
 async def update_donation_leaderboard():
     """Publish/edit the donation leaderboard directly through discord.py."""
     if not DONATION_CHANNEL_ID:
@@ -743,7 +746,7 @@ async def update_donation_leaderboard():
             color=discord.Color.dark_red(),
         )
         ranks_embed.add_field(name="Rank • Donation Total • Reward", value=ranks_text, inline=False)
-        ranks_embed.set_footer(text="Automatische Aktualisierung alle 10 Minuten")
+        ranks_embed.set_footer(text="Automatically updated every 3 minutes")
         top_embed = discord.Embed(title="🏆 Top 5 Donators", description=top_text, color=discord.Color.gold())
         top_embed.set_footer(text="Ranked by confirmed lifetime donations • Anonymous donations are not shown by name")
 
@@ -793,7 +796,8 @@ async def on_ready():
         if live_guild is not None:
             await ensure_donation_roles(live_guild)
         else:
-            log.error("Configured Discord guild %s is not available to the bot", guild_id)        guild = discord.Object(id=guild_id)
+            log.error("Configured Discord guild %s is not available to the bot", guild_id)
+        guild = discord.Object(id=guild_id)
         bot.tree.copy_global_to(guild=guild)
         synced = await bot.tree.sync(guild=guild)
         log.info("Synced %s guild slash commands for guild %s", len(synced), guild_id)
