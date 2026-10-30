@@ -206,6 +206,41 @@ async def cheat(ctx):
         await ctx.send(f"💸 Unlucky! You lost **{amount:,} Coins**. Balance: **{total:,} Coins**.".replace(",", "."))
 
 
+@bot.command(name="give")
+async def give(ctx, member: discord.Member, amount: int):
+    """Add a chosen number of Coins to a member's account (authorized role only)."""
+    if not any(role.id == 1561027890081042563 for role in ctx.author.roles):
+        return await ctx.send("❌ You are not allowed to use this command.")
+    if member.bot:
+        return await ctx.send("❌ You cannot give Coins to bots.")
+    if amount <= 0:
+        return await ctx.send("❌ The amount must be greater than 0.")
+    try:
+        total = change_balance(member.id, amount)
+        await ctx.send(
+            f"✅ Added **{amount:,} Coins** to {member.mention}. "
+            f"New balance: **{total:,} Coins**.".replace(",", ".")
+        )
+    except sqlite3.Error:
+        log.exception("Admin economy give failed")
+        await ctx.send("❌ The balance could not be updated.")
+
+
+@bot.command(name="remove")
+async def remove(ctx, member: discord.Member):
+    """Set a member's entire account balance to zero (authorized role only)."""
+    if not any(role.id == 1561027890081042563 for role in ctx.author.roles):
+        return await ctx.send("❌ You are not allowed to use this command.")
+    try:
+        get_balance(member.id)
+        with economy_db:
+            economy_db.execute("UPDATE accounts SET balance = 0 WHERE user_id = ?", (member.id,))
+        await ctx.send(f"✅ {member.mention}'s entire account balance has been reset to **0 Coins**.")
+    except sqlite3.Error:
+        log.exception("Admin economy reset failed")
+        await ctx.send("❌ The account could not be reset.")
+
+
 @bot.command(name="pay", aliases=["transfer"])
 async def pay(ctx, member: discord.Member, amount: int):
     if member.bot:
