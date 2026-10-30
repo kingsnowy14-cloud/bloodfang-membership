@@ -21,6 +21,7 @@ if not TOKEN:
 
 intents = discord.Intents.default()
 intents.message_content = True
+intents.members = True
 bot = commands.Bot(command_prefix=[".", "!"], intents=intents, status=discord.Status.online, help_command=None)
 
 @bot.command(name="help", aliases=["hilfe", "commands", "befehle"])
@@ -667,6 +668,51 @@ async def _handle_delete_event(guild, target, kind, audit_action):
     finally:
         _active_incidents.discard(key)
         _delete_events.pop(key, None)
+
+
+@bot.event
+async def on_member_update(before: discord.Member, after: discord.Member):
+    """Announce manually added watched roles below the configured notification role."""
+    watched_role_ids = {
+        1564594352393556043, 1564594351856689273, 1564594350531543061,
+        1564594349055156236, 1564594348056780863, 1564594346370670612,
+        1565090381178077368, 1565090379957534815, 1565090378502373579,
+        1565090375889322097, 1565090375046140014, 1565090374014337044,
+        1565090372911370391, 1565090371837362286, 1565090370545647737,
+        1565090369337565206, 1565090368255561829, 1565090366900928632,
+        1565090365688651918, 1561752398937202799,
+    }
+    notification_role_id = 1561027890081042563
+    notification_channel_id = 1561400393282625686
+
+    added_roles = [role for role in after.roles if role not in before.roles and role.id in watched_role_ids]
+    notification_role = after.guild.get_role(notification_role_id)
+    channel = after.guild.get_channel(notification_channel_id)
+    if not added_roles or notification_role is None or not isinstance(channel, discord.TextChannel):
+        return
+
+    # Only announce roles positioned below the notification role in the hierarchy.
+    added_roles = [role for role in added_roles if role < notification_role]
+    if not added_roles:
+        return
+
+    try:
+        async for entry in after.guild.audit_logs(limit=10, action=discord.AuditLogAction.member_role_update):
+            if not entry.target or entry.target.id != after.id:
+                continue
+            if (discord.utils.utcnow() - entry.created_at).total_seconds() > 15:
+                continue
+            if entry.user is None or entry.user.bot:
+                continue
+
+            role_names = ", ".join(discord.utils.escape_markdown(role.name) for role in added_roles)
+            await channel.send(
+                f"{notification_role.mention} **Manual role assignment**\\n"
+                f"{after.mention} was given the role(s) **{role_names}** by {entry.user.mention} manually."
+            )
+            return
+    except (discord.Forbidden, discord.HTTPException):
+        log.exception("Unable to inspect audit logs or announce manual role assignment for member %s", after.id)
 
 
 @bot.event
