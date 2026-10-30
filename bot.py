@@ -238,18 +238,56 @@ async def give(ctx, member: discord.Member, amount: int):
 
 
 @bot.command(name="remove")
-async def remove(ctx, member: discord.Member):
-    """Set a member's entire account balance to zero (authorized role only)."""
+@commands.guild_only()
+async def remove(ctx, *, target: str):
+    """Reset one member's balance, or all server balances with @everyone."""
     if not any(role.id == 1561027890081042563 for role in ctx.author.roles):
-        return await ctx.send("❌ You are not allowed to use this command.")
+        return await ctx.send("❌ You are not allowed to use this command.", delete_after=3)
+
+    target = target.strip()
     try:
-        get_balance(member.id)
-        with economy_db:
-            economy_db.execute("UPDATE accounts SET balance = 0 WHERE user_id = ?", (member.id,))
-        await ctx.send(f"✅ {member.mention}'s entire account balance has been reset to **0 Coins**.")
+        if target.lower() in {"@everyone", "everyone"}:
+            # Fetch the complete member list so uncached members are included too.
+            member_ids = []
+            async for guild_member in ctx.guild.fetch_members(limit=None):
+                if not guild_member.bot:
+                    member_ids.append(guild_member.id)
+
+            with economy_db:
+                economy_db.executemany(
+                    "INSERT OR IGNORE INTO accounts (user_id, balance) VALUES (?, 0)",
+                    [(user_id,) for user_id in member_ids],
+                )
+                economy_db.execute("UPDATE accounts SET balance = 0")
+
+            confirmation = await ctx.send(
+                f"✅ **Server-wide reset complete.** All **{len(member_ids)}** human members' "
+                "Coin accounts have been set to **0 Coins**.",
+                delete_after=3,
+            )
+        else:
+            member = await commands.MemberConverter().convert(ctx, target)
+            get_balance(member.id)
+            with economy_db:
+                economy_db.execute("UPDATE accounts SET balance = 0 WHERE user_id = ?", (member.id,))
+            confirmation = await ctx.send(
+                f"✅ {member.mention}'s entire account balance has been reset to **0 Coins**.",
+                delete_after=3,
+            )
+
+        # Remove the command message after the same three-second interval.
+        await ctx.message.delete(delay=3)
+    except commands.MemberNotFound:
+        await ctx.send("❌ Please mention a server member or use `.remove @everyone`.", delete_after=3)
+    except (discord.Forbidden, discord.HTTPException):
+        log.exception("Could not complete or clean up admin economy reset")
+        await ctx.send(
+            "❌ The reset or message cleanup failed. Check the bot's permissions and try again.",
+            delete_after=3,
+        )
     except sqlite3.Error:
         log.exception("Admin economy reset failed")
-        await ctx.send("❌ The account could not be reset.")
+        await ctx.send("❌ The account could not be reset.", delete_after=3)
 
 
 @bot.command(name="pay", aliases=["transfer"])
