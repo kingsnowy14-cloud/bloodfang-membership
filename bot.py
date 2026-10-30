@@ -723,21 +723,28 @@ async def on_member_update(before: discord.Member, after: discord.Member):
 
             # Unauthorized watched roles are announced and immediately removed again.
             role_names = ", ".join(discord.utils.escape_markdown(role.name) for role in added_roles)
+            removed = False
             try:
                 await after.remove_roles(
                     *added_roles,
                     reason=f"Unauthorized role assignment by {entry.user} (missing authorization role 1561027890643083497)",
                 )
+                removed = True
             except (discord.Forbidden, discord.HTTPException):
                 log.exception(
                     "Unable to remove unauthorized roles %s from member %s",
                     [role.id for role in added_roles], after.id,
                 )
 
+            removal_status = (
+                "The role(s) were removed automatically."
+                if removed
+                else "WARNING: I could not remove the role(s). Check my Manage Roles permission and role hierarchy."
+            )
             await channel.send(
                 f"{notification_role.mention} **Unauthorized role assignment**\\n"
                 f"{after.mention} was given the role(s) **{role_names}** by {entry.user.mention}. "
-                f"The role(s) were removed automatically."
+                f"{removal_status}"
             )
             return
     except (discord.Forbidden, discord.HTTPException):
