@@ -673,10 +673,6 @@ async def _handle_delete_event(guild, target, kind, audit_action):
 @bot.event
 async def on_member_update(before: discord.Member, after: discord.Member):
     """Announce manually added watched roles below the configured notification role."""
-    # Members who hold the notification role must not trigger role announcements.
-    if any(role.id == 1561027890081042563 for role in after.roles):
-        return
-
     watched_role_ids = {
         1564594352393556043, 1564594351856689273, 1564594350531543061,
         1564594349055156236, 1564594348056780863, 1564594346370670612,
@@ -709,10 +705,34 @@ async def on_member_update(before: discord.Member, after: discord.Member):
             if entry.user is None or entry.user.bot:
                 continue
 
+            # Only members with the authorization role may assign watched roles.
+            assigner = entry.user
+            if not isinstance(assigner, discord.Member):
+                assigner = after.guild.get_member(entry.user.id)
+            if assigner is not None and any(role.id == 1561027890643083497 for role in assigner.roles):
+                log.info(
+                    "Allowed watched role assignment: actor=%s target=%s roles=%s",
+                    assigner.id, after.id, [role.id for role in added_roles],
+                )
+                return
+
+            # Unauthorized watched roles are announced and immediately removed again.
             role_names = ", ".join(discord.utils.escape_markdown(role.name) for role in added_roles)
+            try:
+                await after.remove_roles(
+                    *added_roles,
+                    reason=f"Unauthorized role assignment by {entry.user} (missing authorization role 1561027890643083497)",
+                )
+            except (discord.Forbidden, discord.HTTPException):
+                log.exception(
+                    "Unable to remove unauthorized roles %s from member %s",
+                    [role.id for role in added_roles], after.id,
+                )
+
             await channel.send(
-                f"{notification_role.mention} **Manual role assignment**\\n"
-                f"{after.mention} was given the role(s) **{role_names}** by {entry.user.mention} manually."
+                f"{notification_role.mention} **Unauthorized role assignment**\\n"
+                f"{after.mention} was given the role(s) **{role_names}** by {entry.user.mention}. "
+                f"The role(s) were removed automatically."
             )
             return
     except (discord.Forbidden, discord.HTTPException):
