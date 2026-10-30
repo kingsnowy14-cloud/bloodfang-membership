@@ -706,10 +706,15 @@ async def on_member_update(before: discord.Member, after: discord.Member):
                 continue
 
             # Only members with the authorization role may assign watched roles.
-            assigner = entry.user
-            if not isinstance(assigner, discord.Member):
-                assigner = after.guild.get_member(entry.user.id)
-            if assigner is not None and any(role.id == 1561027890643083497 for role in assigner.roles):
+            assigner = after.guild.get_member(entry.user.id)
+            if assigner is None:
+                try:
+                    assigner = await after.guild.fetch_member(entry.user.id)
+                except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                    log.exception("Unable to verify authorization role for role assigner %s", entry.user.id)
+                    return
+
+            if any(role.id == 1561027890643083497 for role in assigner.roles):
                 log.info(
                     "Allowed watched role assignment: actor=%s target=%s roles=%s",
                     assigner.id, after.id, [role.id for role in added_roles],
