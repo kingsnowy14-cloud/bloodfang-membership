@@ -673,6 +673,10 @@ async def _handle_delete_event(guild, target, kind, audit_action):
 @bot.event
 async def on_member_update(before: discord.Member, after: discord.Member):
     """Announce manually added watched roles below the configured notification role."""
+    # Members who hold the notification role must not trigger role announcements.
+    if any(role.id == 1561027890081042563 for role in after.roles):
+        return
+
     watched_role_ids = {
         1564594352393556043, 1564594351856689273, 1564594350531543061,
         1564594349055156236, 1564594348056780863, 1564594346370670612,
