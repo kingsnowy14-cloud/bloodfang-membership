@@ -36,9 +36,9 @@ async def help_command(ctx):
         name="💰 Economy",
         value=(
             "`!balance` / `!bal` [@User] — Show your balance\n"
-            "`!work` / `!w` — Earn Coins (3-hour cooldown)\n"
-            "`!crime` / `!c` — Attempt a crime (3-hour cooldown)\n"
-            "`!cheat` — Win or lose Coins (3-hour cooldown)\n"
+            "`!work` / `!w` — Earn Coins (2-hour cooldown + DM reminder)\n"
+            "`!crime` / `!c` — Attempt a crime (2-hour cooldown + DM reminder)\n"
+            "`!cheat` — Win or lose Coins (2-hour cooldown + DM reminder)\n"
             "`!pay` / `!transfer` @User amount — Transfer Coins"
         ),
         inline=False,
@@ -102,8 +102,12 @@ economy_db.execute("CREATE TABLE IF NOT EXISTS accounts (user_id INTEGER PRIMARY
 economy_db.execute("""CREATE TABLE IF NOT EXISTS economy_cooldowns (
     user_id INTEGER NOT NULL, command TEXT NOT NULL, last_used REAL NOT NULL,
     PRIMARY KEY(user_id, command))""")
+economy_db.execute("""CREATE TABLE IF NOT EXISTS economy_cooldown_notifications (
+    user_id INTEGER NOT NULL, command TEXT NOT NULL, guild_id INTEGER NOT NULL,
+    channel_id INTEGER NOT NULL, notified INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY(user_id, command))""")
 economy_db.commit()
-ECONOMY_COOLDOWN_SECONDS = 3 * 60 * 60
+ECONOMY_COOLDOWN_SECONDS = 2 * 60 * 60
 ECONOMY_ACTION_MIN = 1500
 ECONOMY_ACTION_MAX = 10000
 
@@ -132,12 +136,19 @@ def cooldown_left(user_id: int, command: str) -> int:
     return max(0, int(ECONOMY_COOLDOWN_SECONDS - (time.time() - row[0]) + 0.999))
 
 
-def use_cooldown(user_id: int, command: str) -> None:
+def use_cooldown(user_id: int, command: str, guild_id: int, channel_id: int) -> None:
+    now = time.time()
     with economy_db:
         economy_db.execute(
             """INSERT INTO economy_cooldowns (user_id, command, last_used) VALUES (?, ?, ?)
                ON CONFLICT(user_id, command) DO UPDATE SET last_used = excluded.last_used""",
-            (user_id, command, time.time()))
+            (user_id, command, now))
+        economy_db.execute(
+            """INSERT INTO economy_cooldown_notifications
+               (user_id, command, guild_id, channel_id, notified) VALUES (?, ?, ?, ?, 0)
+               ON CONFLICT(user_id, command) DO UPDATE SET
+               guild_id=excluded.guild_id, channel_id=excluded.channel_id, notified=0""",
+            (user_id, command, guild_id, channel_id))
 
 
 def economy_cooldown_message(left: int, command: str) -> str:
@@ -162,7 +173,7 @@ async def work(ctx):
     left = cooldown_left(ctx.author.id, "work")
     if left:
         return await ctx.send(economy_cooldown_message(left, "work"))
-    use_cooldown(ctx.author.id, "work")
+    use_cooldown(ctx.author.id, "work", ctx.guild.id, ctx.channel.id)
     earned = random.randint(ECONOMY_ACTION_MIN, ECONOMY_ACTION_MAX)
     total = change_balance(ctx.author.id, earned)
     await ctx.send(f"🛠️ Work complete! You earned **{earned:,} Coins**. Balance: **{total:,} Coins**.".replace(",", "."))
@@ -176,7 +187,7 @@ async def crime(ctx):
     current = get_balance(ctx.author.id)
     if current < ECONOMY_ACTION_MIN:
         return await ctx.send(f"❌ You need at least **{ECONOMY_ACTION_MIN:,} Coins** in your balance to use .crime.".replace(",", "."))
-    use_cooldown(ctx.author.id, "crime")
+    use_cooldown(ctx.author.id, "crime", ctx.guild.id, ctx.channel.id)
     if random.random() < 0.45:
         amount = random.randint(ECONOMY_ACTION_MIN, ECONOMY_ACTION_MAX)
         total = change_balance(ctx.author.id, amount)
@@ -195,7 +206,7 @@ async def cheat(ctx):
     current = get_balance(ctx.author.id)
     if current < ECONOMY_ACTION_MIN:
         return await ctx.send(f"❌ You need at least **{ECONOMY_ACTION_MIN:,} Coins** in your balance to use .cheat.".replace(",", "."))
-    use_cooldown(ctx.author.id, "cheat")
+    use_cooldown(ctx.author.id, "cheat", ctx.guild.id, ctx.channel.id)
     if random.random() < 0.5:
         amount = random.randint(ECONOMY_ACTION_MIN, ECONOMY_ACTION_MAX)
         total = change_balance(ctx.author.id, amount)
@@ -348,6 +359,47 @@ async def donation_ranks(ctx):
         fields,
         "Donate through the official BLOODFANG website: " + os.environ.get("PUBLIC_BASE_URL", "https://bloodfang-membership.up.railway.app").rstrip("/") + "/donate",
     )
+
+
+@tasks.loop(minutes=1)
+async def send_economy_cooldown_dms():
+    """DM members when a work/crime/cheat cooldown expires, with a link to its channel."""
+    now = time.time()
+    rows = economy_db.execute(
+        """SELECT n.user_id, n.command, n.guild_id, n.channel_id
+           FROM economy_cooldown_notifications AS n
+           JOIN economy_cooldowns AS c
+             ON c.user_id=n.user_id AND c.command=n.command
+           WHERE n.notified=0 AND c.last_used + ? <= ?""",
+        (ECONOMY_COOLDOWN_SECONDS, now),
+    ).fetchall()
+    for user_id, command, guild_id, channel_id in rows:
+        try:
+            guild = bot.get_guild(guild_id)
+            member = guild.get_member(user_id) if guild else None
+            if guild and member is None:
+                try:
+                    member = await guild.fetch_member(user_id)
+                except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                    member = None
+            if member is not None:
+                channel_url = f"https://discord.com/channels/{guild_id}/{channel_id}"
+                command_name = {"work": ".w / .work", "crime": ".crime", "cheat": ".cheat"}.get(command, command)
+                try:
+                    await member.send(
+                        f"⏰ Your **{command_name}** cooldown has ended! You can use it again now.\n"
+                        f"👉 [Click here to open the channel]({channel_url})"
+                    )
+                except (discord.Forbidden, discord.HTTPException):
+                    log.info("Could not DM cooldown-ready notification to user %s", user_id)
+        except Exception:
+            log.exception("Failed cooldown-ready notification for user %s (%s)", user_id, command)
+        finally:
+            with economy_db:
+                economy_db.execute(
+                    "UPDATE economy_cooldown_notifications SET notified=1 WHERE user_id=? AND command=?",
+                    (user_id, command),
+                )
 
 
 @tasks.loop(minutes=2)
@@ -909,6 +961,8 @@ async def on_ready():
     )
     if not rotate_status.is_running():
         rotate_status.start()
+    if not send_economy_cooldown_dms.is_running():
+        send_economy_cooldown_dms.start()
     if not update_donation_leaderboard.is_running():
         update_donation_leaderboard.start()
     try:
