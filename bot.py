@@ -61,6 +61,48 @@ async def help_command(ctx):
     embed.set_footer(text="For help or issues, contact the BLOODFANG team.")
     await ctx.send(embed=embed)
 
+
+@bot.tree.command(name="help", description="Show BLOODFANG bot commands")
+async def help_slash(interaction: discord.Interaction):
+    """Show the available BLOODFANG bot commands privately."""
+    embed = discord.Embed(
+        title="🩸 BLOODFANG Bot — Help",
+        description="Available commands for the BLOODFANG Discord server.",
+        color=discord.Color.dark_red(),
+    )
+    embed.add_field(
+        name="💰 Economy (prefix commands: ! or .)",
+        value=(
+            "`!balance` / `!bal` [@User] — Show a balance\n"
+            "`!work` / `!w` — Earn Coins (2-hour cooldown)\n"
+            "`!crime` / `!c` — Attempt a crime (2-hour cooldown)\n"
+            "`!cheat` — Risk Coins for a possible win or loss\n"
+            "`!pay` / `!transfer` @User amount — Transfer Coins\n"
+            "`!give` @User amount — Add Coins (authorized staff only)\n"
+            "`!remove` @User or `!remove @everyone` — Reset balances (authorized staff only)"
+        ),
+        inline=False,
+    )
+    embed.add_field(
+        name="🩸 Shop & Membership",
+        value=(
+            "`!membership` — Membership ranks and prices via DM\n"
+            "`!pointshop` — Points packages and prices via DM\n"
+            "`!donat` — Donation ranks and bonuses via DM\n"
+            "`/mymembership` — Check your membership\n"
+            "`/donat` — Configure the donation leaderboard"
+        ),
+        inline=False,
+    )
+    embed.add_field(
+        name="🛠️ Administration",
+        value="`/shoplog` — Configure the shop purchase log (Manage Server permission required)",
+        inline=False,
+    )
+    embed.set_footer(text="For help or issues, contact the BLOODFANG team.")
+    await interaction.response.send_message(embed=embed, ephemeral=True)
+
+
 STATUS_ACTIVITIES = [
     discord.Game(name="!membership"),
     discord.Game(name="!pointshop"),
