@@ -18,7 +18,9 @@ PUBLIC_BASE_URL = os.environ.get("PUBLIC_BASE_URL", "").rstrip("/")
 DISCORD_BOT_TOKEN = os.environ.get("DISCORD_BOT_TOKEN", "")
 DISCORD_GUILD_ID = os.environ.get("DISCORD_GUILD_ID", "1561027077984227371")
 DISCORD_NOTIFICATION_USER_ID = os.environ.get("DISCORD_NOTIFICATION_USER_ID", "1493110334280564807").strip()
-ENABLE_TEST_PURCHASES = os.environ.get("ENABLE_TEST_PURCHASES", "false").lower() == "true"
+ENABLE_TEST_PURCHASES = os.environ.get("ENABLE_TEST_PURCHASES", "true").lower() == "true"
+STRIPE_SECRET_KEY = os.environ.get("STRIPE_SECRET_KEY", "")
+STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
 
 TIERS = [
     {"name":"STALKER","emoji":"🦴","price":"4,99","points":"25.000","storage":"5"},
@@ -43,7 +45,7 @@ POINT_PACKAGES = [
 @app.get("/")
 def index():
     return render_template("index.html", tiers=TIERS, points=POINT_PACKAGES, user=session.get("discord_user"),
-                           paypal_configured=bool(PAYPAL_CLIENT_ID and PAYPAL_CLIENT_SECRET and PAYPAL_WEBHOOK_ID))
+                           paypal_configured=bool(STRIPE_SECRET_KEY))
 
 @app.get("/points-shop")
 def points_shop():
@@ -122,19 +124,16 @@ def checkout(tier_name):
     if not tier:
         return render_template("message.html", title="Rank not found", message="This membership rank does not exist."), 404
     if request.method == "GET":
-        if not (PAYPAL_CLIENT_ID and PAYPAL_CLIENT_SECRET and PAYPAL_WEBHOOK_ID):
-            return render_template(
-                "message.html",
-                title="Checkout is not ready yet",
-                message="Secure PayPal checkout is not fully configured. No payment has been taken. Please try again later or contact BLOODFANG staff.",
-            ), 503
+        if not STRIPE_SECRET_KEY and not ENABLE_TEST_PURCHASES:
+            return render_template("message.html", title="Checkout is not ready yet",
+                                   message="Stripe is not configured. No payment has been taken."), 503
         requested_type = request.args.get("purchase_type", "subscription")
         if requested_type not in ("subscription", "one_time"):
             requested_type = "subscription"
         session["checkout_csrf"] = secrets.token_urlsafe(24)
         return render_template("message.html", title="Membership checkout", tier=tier, user=user,
                                test_mode=ENABLE_TEST_PURCHASES, csrf_token=session["checkout_csrf"],
-                               payment_mode=True, purchase_type=requested_type, paypal_enabled=True)
+                               payment_mode=True, purchase_type=requested_type, stripe_enabled=bool(STRIPE_SECRET_KEY))
     submitted_token = request.form.get("csrf_token", "")
     saved_token = session.pop("checkout_csrf", "")
     if not submitted_token or not saved_token or not secrets.compare_digest(submitted_token, saved_token):
@@ -143,13 +142,9 @@ def checkout(tier_name):
     provider = request.form.get("provider", "").lower()
     if purchase_type not in ("one_time", "subscription"):
         return render_template("message.html", title="Invalid purchase type", message="Choose a one-time purchase or monthly subscription."), 400
-    if provider != "paypal":
-        return render_template("message.html", title="Invalid payment provider", message="Only PayPal payments are supported."), 400
-    if not PUBLIC_BASE_URL:
-        return render_template("message.html", title="Website URL missing", message="Set PUBLIC_BASE_URL in Railway to your public https:// website URL."), 503
-    if not DISCORD_BOT_TOKEN or not DISCORD_GUILD_ID:
-        return render_template("message.html", title="Discord role assignment is not configured", message="Set DISCORD_BOT_TOKEN and DISCORD_GUILD_ID in Railway."), 503
     if ENABLE_TEST_PURCHASES and request.form.get("test_purchase") == "yes":
+        if not DISCORD_BOT_TOKEN or not DISCORD_GUILD_ID:
+            return render_template("message.html", title="Discord role assignment is not configured", message="Set DISCORD_BOT_TOKEN and DISCORD_GUILD_ID in Railway."), 503
         import asyncio
         try:
             asyncio.run(assign_membership_role(user["id"], tier["name"]))
@@ -160,12 +155,15 @@ def checkout(tier_name):
             return render_template("message.html", title="Could not activate test membership", message=str(exc)), 502
         return render_template("message.html", title="Test membership activated",
                                message=f"TEST ONLY: {tier['name']} role assigned. No payment was taken.")
+    if provider != "stripe":
+        return render_template("message.html", title="Invalid payment provider", message="Only Stripe payments are supported."), 400
+    if not STRIPE_SECRET_KEY or not PUBLIC_BASE_URL:
+        return render_template("message.html", title="Stripe checkout unavailable", message="Configure STRIPE_SECRET_KEY and PUBLIC_BASE_URL in Railway. No payment was taken."), 503
     try:
-        import asyncio
-        checkout_url = asyncio.run(create_paypal_checkout(user, tier, purchase_type))
-    except Exception as exc:
-        app.logger.exception("Could not create %s checkout", provider)
-        return render_template("message.html", title="Checkout could not be started", message=str(exc)), 502
+        checkout_url = create_stripe_membership_checkout(user, tier, purchase_type)
+    except Exception:
+        app.logger.exception("Could not create Stripe membership checkout")
+        return render_template("message.html", title="Checkout could not be started", message="Stripe could not start checkout. No payment was taken."), 502
     return redirect(checkout_url)
 
 
@@ -369,7 +367,7 @@ def donate_page():
                              ORDER BY total_cents DESC, donation_count DESC, display_name COLLATE NOCASE ASC LIMIT 5""").fetchall()
     leaderboard = [{"rank": i + 1, "name": ("Anonymous donor" if row["display_name"] == "__anonymous__" else row["display_name"]),
                     "total": f"{row['total_cents'] / 100:.2f}"} for i, row in enumerate(rows)]
-    return render_template("donate.html", user=session.get("discord_user"), csrf_token=session.get("donate_csrf"), paypal_configured=bool(PAYPAL_CLIENT_ID and PAYPAL_CLIENT_SECRET), leaderboard=leaderboard)
+    return render_template("donate.html", user=session.get("discord_user"), csrf_token=session.get("donate_csrf"), paypal_configured=bool(STRIPE_SECRET_KEY), leaderboard=leaderboard)
 
 @app.post("/donate/checkout")
 def donate_checkout():
@@ -385,18 +383,15 @@ def donate_checkout():
         amount = 0
     if amount < 1 or amount > 1000:
         return render_template("message.html", title="Invalid amount", message="Choose between EUR 1 and EUR 1,000."), 400
-    if not (PAYPAL_CLIENT_ID and PAYPAL_CLIENT_SECRET and PAYPAL_WEBHOOK_ID and PUBLIC_BASE_URL):
-        return render_template("message.html", title="Donation checkout not configured", message="Configure PayPal credentials, webhook ID and the public website URL in Railway. No payment was taken."), 503
-    if not DISCORD_BOT_TOKEN or not DISCORD_GUILD_ID:
-        return render_template("message.html", title="Discord role assignment is not configured", message="Set DISCORD_BOT_TOKEN and DISCORD_GUILD_ID in Railway."), 503
+    if not (STRIPE_SECRET_KEY and PUBLIC_BASE_URL):
+        return render_template("message.html", title="Donation checkout not configured", message="Configure STRIPE_SECRET_KEY and PUBLIC_BASE_URL in Railway. No payment was taken."), 503
     anonymous = request.form.get("anonymous") == "yes"
     display_name = "__anonymous__" if anonymous else (user.get("global_name") or user.get("username") or "Donator")
-    import asyncio
     try:
-        checkout_url = asyncio.run(create_paypal_donation(user["id"], amount, display_name, anonymous))
+        checkout_url = create_stripe_donation_checkout(user["id"], amount, display_name, anonymous)
     except Exception:
-        app.logger.exception("Could not create PayPal donation checkout")
-        return render_template("message.html", title="Donation checkout failed", message="PayPal could not start the donation. No donation role was granted."), 502
+        app.logger.exception("Could not create Stripe donation checkout")
+        return render_template("message.html", title="Donation checkout failed", message="Stripe could not start the donation."), 502
     return redirect(checkout_url)
 
 
@@ -624,6 +619,110 @@ def record_confirmed_donation(capture_id, user_id, display_name, amount_cents, a
     rank = asyncio.run(assign_donation_rank(str(user_id), int(total)))
     return rank, int(total)
 
+
+
+def _stripe():
+    import stripe
+    stripe.api_key = STRIPE_SECRET_KEY
+    return stripe
+
+def create_stripe_membership_checkout(user, tier, purchase_type):
+    stripe = _stripe()
+    cents = int(round(float(tier["price"].replace(".", "").replace(",", ".")) * 100))
+    metadata = {"kind": "membership", "user_id": str(user["id"]), "tier": tier["name"], "purchase_type": purchase_type}
+    params = {
+        "mode": "subscription" if purchase_type == "subscription" else "payment",
+        "line_items": [{"price_data": {"currency": "eur", "unit_amount": cents,
+            "product_data": {"name": f"BLOODFANG {tier['name']} membership"}},
+            "quantity": 1}],
+        "success_url": PUBLIC_BASE_URL + "/payment/success?session_id={CHECKOUT_SESSION_ID}",
+        "cancel_url": PUBLIC_BASE_URL + "/checkout/" + tier["name"].lower().replace(" ", "-"),
+        "metadata": metadata,
+    }
+    if purchase_type == "subscription":
+        params["subscription_data"] = {"metadata": metadata}
+    return stripe.checkout.Session.create(**params).url
+
+def create_stripe_donation_checkout(user_id, amount, display_name, anonymous):
+    stripe = _stripe()
+    return stripe.checkout.Session.create(
+        mode="payment",
+        line_items=[{"price_data": {"currency": "eur", "unit_amount": int(round(amount * 100)),
+            "product_data": {"name": "BLOODFANG donation"}}, "quantity": 1}],
+        success_url=PUBLIC_BASE_URL + "/payment/success?session_id={CHECKOUT_SESSION_ID}",
+        cancel_url=PUBLIC_BASE_URL + "/donate",
+        metadata={"kind": "donation", "user_id": str(user_id),
+                  "display_name": display_name, "anonymous": "true" if anonymous else "false"},
+    ).url
+
+@app.post("/webhooks/stripe")
+def stripe_webhook():
+    stripe = _stripe()
+    payload = request.get_data()
+    signature = request.headers.get("Stripe-Signature", "")
+    try:
+        event = stripe.Webhook.construct_event(payload, signature, STRIPE_WEBHOOK_SECRET)
+    except Exception:
+        app.logger.exception("Stripe webhook signature verification failed")
+        return {"error": "invalid signature"}, 400
+    event_type = event["type"]
+    obj = event["data"]["object"]
+    if event_type == "checkout.session.completed":
+        meta = obj.get("metadata") or {}
+        if meta.get("kind") == "donation" and obj.get("payment_status") == "paid":
+            try:
+                record_confirmed_donation(str(obj["id"]), str(meta["user_id"]),
+                    meta.get("display_name") or "Donator", int(obj.get("amount_total") or 0),
+                    meta.get("anonymous") == "true")
+            except Exception:
+                app.logger.exception("Stripe donation processing failed")
+                return {"error": "donation processing failed"}, 500
+        elif meta.get("kind") == "membership":
+            user_id, tier_name = str(meta.get("user_id", "")), meta.get("tier", "")
+            if not user_id.isdigit() or not any(t["name"] == tier_name for t in TIERS):
+                return {"error": "invalid membership metadata"}, 400
+            if obj.get("mode") == "subscription":
+                sub_id = obj.get("subscription")
+                with db_connect() as db:
+                    db.execute("""INSERT INTO memberships(user_id,tier_name,provider,provider_ref,purchase_type,status,expires_at,created_at)
+                                  VALUES(?,?, 'stripe', ?, 'subscription','pending',NULL,?)
+                                  ON CONFLICT(provider_ref) DO NOTHING""",
+                               (user_id, tier_name, "stripe-sub-" + str(sub_id), int(time.time())))
+            elif obj.get("payment_status") == "paid":
+                try:
+                    import asyncio
+                    asyncio.run(assign_membership_role(user_id, tier_name))
+                    save_purchase(user_id, tier_name, str(obj["id"]), "one_time",
+                                  int(time.time()) + 30 * 86400, "stripe",
+                                  email=(obj.get("customer_details") or {}).get("email"))
+                except Exception:
+                    app.logger.exception("Stripe one-time membership activation failed")
+                    return {"error": "membership activation failed"}, 500
+    elif event_type == "invoice.payment_succeeded":
+        sub_id = obj.get("subscription")
+        with db_connect() as db:
+            row = db.execute("SELECT user_id,tier_name FROM memberships WHERE provider_ref=?",
+                             ("stripe-sub-" + str(sub_id),)).fetchone()
+        if row:
+            expires_at = int(time.time()) + 30 * 86400
+            try:
+                import asyncio
+                asyncio.run(assign_membership_role(row["user_id"], row["tier_name"]))
+                with db_connect() as db:
+                    db.execute("UPDATE memberships SET status='active', expires_at=?, last_event=? WHERE provider_ref=?",
+                               (expires_at, str(event["id"]), "stripe-sub-" + str(sub_id)))
+                send_shop_log(title="Stripe membership payment confirmed", user_id=str(row["user_id"]),
+                    tier_name=row["tier_name"], purchase_type="subscription", provider="stripe",
+                    provider_ref="stripe-sub-" + str(sub_id), expires_at=expires_at,
+                    status="Payment confirmed / access extended")
+            except Exception:
+                app.logger.exception("Stripe subscription activation failed")
+                return {"error": "activation failed"}, 500
+    elif event_type == "customer.subscription.deleted":
+        with db_connect() as db:
+            db.execute("UPDATE memberships SET last_event='cancelled_by_provider' WHERE provider_ref=?",
+                       ("stripe-sub-" + str(obj.get("id")),))
+    return {"received": True}
 
 @app.get("/payment/success")
 def payment_success():
@@ -960,7 +1059,7 @@ def withdrawal():
 def health():
     return {
         "status": "ok",
-        "paypal_configured": bool(PAYPAL_CLIENT_ID and PAYPAL_CLIENT_SECRET and PAYPAL_WEBHOOK_ID),
+        "paypal_configured": bool(STRIPE_SECRET_KEY),
         "discord_roles_configured": bool(DISCORD_BOT_TOKEN and DISCORD_GUILD_ID),
         "database_path": DB_PATH,
     }
