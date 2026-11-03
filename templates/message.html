@@ -14,7 +14,7 @@
     {% if tier is defined %}
       <div class="eyebrow checkout-eyebrow">SECURE MEMBERSHIP CHECKOUT</div>
       <h1>{{ tier.emoji }} {{ tier.name }}</h1>
-      <p class="checkout-intro">Review your membership and billing choice before continuing to PayPal.</p>
+      <p class="checkout-intro">Review your membership and billing choice before continuing to Stripe.</p>
 
       <div class="checkout-summary">
         <div><span>Membership rank</span><strong>{{ tier.name }}</strong></div>
@@ -33,14 +33,14 @@
 
         <label for="provider">Payment method</label>
         <select id="provider" name="provider" required>
-          {% if paypal_enabled %}<option value="paypal">PayPal</option>{% endif %}
+          {% if stripe_enabled %}<option value="stripe">Credit or debit card · Stripe</option>{% endif %}
         </select>
 
         {% if test_mode %}
           <label class="test-option"><input type="checkbox" name="test_purchase" value="yes"> Test only: assign the Discord role without charging</label>
         {% endif %}
 
-        <button class="primary checkout-submit" type="submit">Continue to PayPal <span>↗</span></button>
+        <button class="primary checkout-submit" type="submit">Continue to Stripe <span>↗</span></button>
       </form>
 
       <div class="checkout-notice">
