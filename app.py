@@ -38,8 +38,6 @@ POINT_PACKAGES = [
     {"points":"150.000.000","price":"230,00","featured":False},
     {"points":"300.000.000","price":"350,00","featured":False},
     {"points":"500.000.000","price":"500,00","featured":False},
-    {"points":"750.000.000","price":"750,00","featured":False},
-    {"points":"1.000.000.000","price":"1.000,00","featured":False},
 ]
 
 @app.get("/")
