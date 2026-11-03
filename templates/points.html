@@ -3,22 +3,38 @@
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#0c0b0d">
-  <title>BLOODFANG | Points Shop</title>
+  <title>BLOODFANG | Bloodpoints Store</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-<header class="topbar"><a class="brand" href="/">BLOOD<span>FANG</span></a><nav class="main-nav"><a class="navbtn" href="/">Home</a><a class="navbtn" href="/#ranks">Memberships</a>
-{% if user %}<a class="navbtn" href="/my-memberships">My Memberships</a><span class="user">Signed in: {{ user.global_name }}</span><a class="navbtn" href="/logout">Sign out</a>
-{% else %}<a class="navbtn" href="/login">Connect Discord</a>{% endif %}
-</nav></header>
+<header class="topbar">
+  <a class="brand" href="/">BLOOD<span>FANG</span><small>STORE</small></a>
+  <nav class="main-nav" aria-label="Store navigation">
+    <a class="navbtn" href="/">Memberships</a><a class="navbtn active" href="/points-shop">Bloodpoints</a><a class="navbtn" href="/donate">Donations</a>
+    {% if user %}<a class="navbtn" href="/my-memberships">My purchases</a><span class="user">{{ user.global_name }}</span><a class="navbtn" href="/logout">Sign out</a>{% else %}<a class="navbtn" href="/login">Sign in</a>{% endif %}
+  </nav>
+</header>
 <main>
-<section class="hero points-hero"><div class="eyebrow">THE ISLE: EVRIMA · ONE-TIME PURCHASES</div><h1>BLOODPOINTS<br><span>SHOP.</span></h1>
-<p>Choose your BLOODFANG points package. Every offer on this page is a one-time purchase, not a monthly membership subscription.</p>
-<a class="primary" href="#points-packages">Explore packages <span>↓</span></a><div class="hero-mark">BF</div></section>
-<section class="section points-section" id="points-packages"><div class="sales-stats" aria-label="Purchase statistics"><div class="sales-stats-icon">↗</div><div class="sales-stats-copy"><strong>Purchase statistics</strong><span>Most purchased membership: <b>Not available yet</b></span><span>Most purchased package: <b>Not available yet</b></span><small>Live sales statistics are not connected to this panel yet.</small></div><span class="stats-status">AWAITING SALES DATA</span></div><div class="section-head"><div><div class="eyebrow">ONE-TIME PURCHASES</div><h2>Choose a package</h2></div><p>Pick the amount that suits your hunt. Prices shown are per package.</p></div>
-<div class="points-grid">{% for pack in points %}<article class="point-card {% if pack.featured %}point-featured{% endif %}"><div class="eyebrow">BLOODFANG POINTS</div><h3>{{ pack.points }}</h3><p>Points package · one-time purchase</p><div class="point-price">€{{ pack.price }}</div><div class="point-note">One-time package · checkout not enabled</div><button class="tier-button tier-unavailable" type="button" disabled aria-disabled="true" title="Point-pack checkout and delivery are not configured yet">Purchases coming soon <span>⌛</span></button></article>{% endfor %}</div>
-<p class="disclaimer"><strong>Purchase status:</strong> These packages are displayed for preview only. There is no point-pack checkout or automatic point delivery yet. No payment will be taken, and points will not be credited from this page.</p>
-</section>
-<section class="cta"><div class="eyebrow">YOUR RANK. YOUR RULES.</div><h2>Want more than points?</h2><p>Explore the separate BLOODFANG membership ranks and their proposed benefits.</p><a class="primary" href="/#ranks">View memberships <span>↗</span></a></section>
-</main><footer><a class="brand" href="/">BLOOD<span>FANG</span></a><span>Fan community · The Isle: Evrima</span><span>Points shop · preview only, purchases disabled</span><nav class="legal-links"><a href="/imprint">Legal Notice</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="/withdrawal">Withdrawal & Cancellation</a></nav></footer>
+  <section class="hero points-hero">
+    <div class="eyebrow">THE ISLE: EVRIMA · BLOODFANG STORE</div>
+    <h1>BLOODPOINTS<br><span>PACKAGES.</span></h1>
+    <p>Choose a one-time Bloodpoints package. All prices are shown per package.</p>
+    <a class="primary" href="#points-packages">View packages <span>↓</span></a><div class="hero-mark">BF</div>
+  </section>
+  <section class="section points-section" id="points-packages">
+    <div class="section-head"><div><div class="eyebrow">ONE-TIME PURCHASES</div><h2>Select a package</h2></div><p>Pick the package that suits your hunt.</p></div>
+    <div class="points-grid">
+      {% for pack in points %}
+      <article class="point-card {% if pack.featured %}point-featured{% endif %}">
+        <div class="eyebrow">BLOODFANG POINTS</div><h3>{{ pack.points }}</h3>
+        <p>Points package · one-time purchase</p><div class="point-price">€{{ pack.price }}</div>
+        <div class="point-note">One-time package</div>
+        <button class="tier-button tier-unavailable" type="button" disabled aria-disabled="true">Purchases coming soon <span>⌛</span></button>
+      </article>
+      {% endfor %}
+    </div>
+    <p class="disclaimer"><strong>Purchase status:</strong> Point-pack checkout and automatic delivery are not configured yet. These packages are shown for preview only; no payment will be taken and points will not be credited from this page.</p>
+  </section>
+</main>
+<footer><a class="brand" href="/">BLOOD<span>FANG</span><small>STORE</small></a><span>Bloodpoints store · one-time packages</span><nav class="legal-links"><a href="/imprint">Legal Notice</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="/withdrawal">Withdrawal & Cancellation</a></nav></footer>
 </body></html>
