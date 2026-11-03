@@ -3,65 +3,97 @@
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#0c0b0d">
-  <title>BLOODFANG | Welcome</title>
+  <meta name="description" content="BLOODFANG Store — memberships, Bloodpoints and donations for The Isle: Evrima.">
+  <title>BLOODFANG STORE | The Isle: Evrima</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
-<body class="welcome-locked">
-<div class="welcome-gate" id="welcome-gate" role="dialog" aria-modal="true" aria-labelledby="welcome-title">
-  <div class="welcome-gate-content">
-    <div class="eyebrow">THE ISLE: EVRIMA · OFFICIAL COMMUNITY</div>
-    <div class="gate-mark">BF</div>
-    <h1 id="welcome-title">WELCOME TO<br><span>BLOODFANG.</span></h1>
-    <p>Enter the wild. Join the BLOODFANG community, connect your Discord account, and discover membership ranks and rewards.</p>
-    <div class="welcome-actions gate-actions">
-      <button class="primary enter-site" id="enter-site" type="button">Enter Website <span>→</span></button>
-      <a class="primary" href="/login">Connect Discord <span>↗</span></a>
-      <a class="primary discord-join" href="https://discord.gg/fHVxUbWX94" target="_blank" rel="noopener noreferrer">Join Discord <span>↗</span></a>
-    </div>
-    <div class="gate-foot">SURVIVE · HUNT · BELONG</div>
-  </div>
-</div>
-<header class="topbar"><a class="brand" href="/">BLOOD<span>FANG</span></a><nav class="main-nav"><a class="navbtn" href="#ranks">Memberships</a><a class="navbtn" href="/points-shop">Points Shop</a><a class="navbtn" href="/donate">Donate</a>
-{% if user %}<a class="navbtn" href="/my-memberships">My Memberships</a><span class="user">Signed in: {{ user.global_name }}</span><a class="navbtn" href="/logout">Sign out</a>
-{% else %}<a class="navbtn" href="/login">Connect Discord</a>{% endif %}
-</nav></header>
+<body class="store-page">
+<header class="topbar">
+  <a class="brand" href="/">BLOOD<span>FANG</span><small>STORE</small></a>
+  <nav class="main-nav" aria-label="Store navigation">
+    <a class="navbtn" href="#memberships">Memberships</a>
+    <a class="navbtn" href="/points-shop">Bloodpoints</a>
+    <a class="navbtn" href="/donate">Donations</a>
+    {% if user %}
+      <a class="navbtn" href="/my-memberships">My purchases</a>
+      <span class="user">{{ user.global_name }}</span>
+      <a class="navbtn" href="/logout">Sign out</a>
+    {% else %}
+      <a class="navbtn" href="/login">Sign in</a>
+    {% endif %}
+  </nav>
+</header>
 <main>
-<section class="hero"><div class="eyebrow">THE ISLE: EVRIMA · WELCOME TO BLOODFANG</div><h1>WELCOME<br><span>TO BLOODFANG.</span></h1>
-<p>Become part of the BLOODFANG community! Connect your Discord account, explore our membership ranks, or join our Discord server.</p>
-<div class="welcome-actions"><a class="primary" href="/login">Connect Discord <span>↗</span></a><a class="primary discord-join" href="https://discord.gg/fHVxUbWX94" target="_blank" rel="noopener noreferrer">Join Discord <span>↗</span></a></div>
-<div class="hero-mark">BF</div></section>
-<section class="section" id="ranks"><div class="sales-stats" aria-label="Purchase statistics"><div class="sales-stats-icon">↗</div><div class="sales-stats-copy"><strong>Purchase statistics</strong><span>Most purchased membership: <b>Not available yet</b></span><span>Most purchased package: <b>Not available yet</b></span><small>Live sales statistics are not connected to this panel yet.</small></div><span class="stats-status">AWAITING SALES DATA</span></div><div class="section-head"><div><div class="eyebrow">CHOOSE YOUR RANK</div><h2>Membership Ranks</h2></div><p>Explore our ranks. <strong>Billed monthly.</strong></p></div>
-<div class="tiers">{% for tier in tiers %}<article class="tier {% if tier.name in ['APEX','BLOOD EMPEROR','BLOOD TITAN','BLOOD GOD'] %}elite{% endif %}">
-<div class="tier-top"><span class="emoji">{{ tier.emoji }}</span><span class="tier-index">{{ "%02d"|format(loop.index) }}</span></div>
-<h3>{{ tier.name }}</h3><div class="price">€{{ tier.price }}<small> / month</small></div>
-<label class="purchase-choice-label" for="purchase-{{ loop.index }}">Choose your payment option</label>
-<select class="purchase-choice" id="purchase-{{ loop.index }}" data-base="/checkout/{{ tier.name|lower|replace(' ', '-') }}" aria-label="Payment option for {{ tier.name }}">
-<option value="subscription" selected>Pay monthly — €{{ tier.price }} every month</option>
-<option value="one_time">Pay once — access for 30 days</option>
-</select>
-<div class="benefits"><div><span>Bloodpoints / day</span><strong>{{ tier.points }}</strong></div><div><span>Storage slots</span><strong>{{ tier.storage }}</strong></div><div><span>Discord role</span><strong>Included</strong></div>
-{% if tier.name in ['APEX','BLOOD EMPEROR','BLOOD TITAN','BLOOD GOD'] %}<div><span>Rank icon</span><strong>Planned</strong></div>{% endif %}
-{% if tier.name in ['BLOOD TITAN','BLOOD GOD'] %}<div><span>Priority Support</span><strong>Included</strong></div>{% endif %}</div>
-{% if paypal_configured %}{% if user %}<a class="tier-button tier-checkout" data-checkout-base="/checkout/{{ tier.name|lower|replace(' ', '-') }}" data-login-required="no" href="/checkout/{{ tier.name|lower|replace(' ', '-') }}">Continue to checkout <span>↗</span></a>{% else %}<a class="tier-button tier-checkout" data-checkout-base="/checkout/{{ tier.name|lower|replace(' ', '-') }}" data-login-required="yes" href="/login">Connect Discord to continue <span>↗</span></a>{% endif %}{% else %}<button class="tier-button tier-unavailable" type="button" disabled title="PayPal checkout is not configured yet">Checkout unavailable <span>🔒</span></button>{% endif %}
-</article>{% endfor %}</div>
-<p class="disclaimer"><strong>Payment options:</strong> Monthly subscriptions renew every month. A one-time payment grants the selected rank for 30 days and does not renew automatically. Check your selected option before continuing.</p>
-{% if paypal_configured %}<p class="disclaimer"><strong>Checkout status:</strong> PayPal credentials and webhook settings were detected. Monthly checkout also requires a PayPal plan ID for the selected rank.</p>{% else %}<p class="disclaimer"><strong>Checkout status:</strong> Membership checkout is currently unavailable because PayPal is not fully configured. The purchase buttons remain disabled until setup is complete.</p>{% endif %}
-<p class="disclaimer">In-game benefits such as Bloodpoints and storage slots depend on the Evrima server integration being configured and working.</p>
-</section>
-<section class="cta"><div class="eyebrow">YOUR RANK. YOUR RULES.</div><h2>Ready to hunt?</h2><p>Connect Discord and become part of the BLOODFANG community.</p><div class="welcome-actions"><a class="primary" href="/login">Connect Discord <span>↗</span></a><a class="primary discord-join" href="https://discord.gg/fHVxUbWX94" target="_blank" rel="noopener noreferrer">Join Discord <span>↗</span></a></div></section>
-</main><footer><a class="brand" href="/">BLOOD<span>FANG</span></a><span>Fan community · The Isle: Evrima</span><span>{% if paypal_configured %}Membership portal · PayPal settings detected{% else %}Membership portal · checkout setup incomplete{% endif %}</span><nav class="legal-links"><a href="/imprint">Legal Notice</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="/withdrawal">Withdrawal & Cancellation</a></nav></footer>
+  <section class="hero store-hero">
+    <div class="eyebrow">THE ISLE: EVRIMA · BLOODFANG STORE</div>
+    <h1>SUPPORT THE PACK.<br><span>GET YOUR REWARDS.</span></h1>
+    <p>Browse Bloodfang memberships, Bloodpoints packages and one-time donations — all in one place.</p>
+    <div class="store-actions">
+      <a class="primary" href="#memberships">Shop memberships <span>↓</span></a>
+      <a class="store-secondary" href="/points-shop">Browse Bloodpoints <span>↗</span></a>
+    </div>
+    <div class="hero-mark">BF</div>
+  </section>
+
+  <section class="section store-categories" aria-label="Store categories">
+    <a class="store-category" href="#memberships"><span class="category-symbol">Ⅰ</span><span class="eyebrow">RECURRING OR ONE-TIME</span><strong>Memberships</strong><small>Choose your Bloodfang rank.</small></a>
+    <a class="store-category" href="/points-shop"><span class="category-symbol">Ⅱ</span><span class="eyebrow">ONE-TIME PACKAGES</span><strong>Bloodpoints</strong><small>Choose a points package.</small></a>
+    <a class="store-category" href="/donate"><span class="category-symbol">Ⅲ</span><span class="eyebrow">COMMUNITY SUPPORT</span><strong>Donations</strong><small>Support Bloodfang with an amount of your choice.</small></a>
+  </section>
+
+  <section class="section" id="memberships">
+    <div class="section-head">
+      <div><div class="eyebrow">THE MEMBERSHIP STORE</div><h2>Choose your rank</h2></div>
+      <p>Membership offers and prices. Select monthly billing or a one-time 30-day purchase.</p>
+    </div>
+    <div class="tiers">
+      {% for tier in tiers %}
+      <article class="tier {% if tier.name in ['APEX','BLOOD EMPEROR','BLOOD TITAN','BLOOD GOD'] %}elite{% endif %}">
+        <div class="tier-top"><span class="emoji">{{ tier.emoji }}</span><span class="tier-index">{{ "%02d"|format(loop.index) }}</span></div>
+        <h3>{{ tier.name }}</h3>
+        <div class="price">€{{ tier.price }}<small> / month</small></div>
+        <label class="purchase-choice-label" for="purchase-{{ loop.index }}">Payment option</label>
+        <select class="purchase-choice" id="purchase-{{ loop.index }}" data-base="/checkout/{{ tier.name|lower|replace(' ', '-') }}" aria-label="Payment option for {{ tier.name }}">
+          <option value="subscription" selected>Monthly — €{{ tier.price }} / month</option>
+          <option value="one_time">One-time — 30 days</option>
+        </select>
+        <div class="benefits">
+          <div><span>Bloodpoints / day</span><strong>{{ tier.points }}</strong></div>
+          <div><span>Storage slots</span><strong>{{ tier.storage }}</strong></div>
+          <div><span>Discord role</span><strong>Included</strong></div>
+        </div>
+        {% if paypal_configured %}
+          {% if user %}
+            <a class="tier-button tier-checkout" data-checkout-base="/checkout/{{ tier.name|lower|replace(' ', '-') }}" data-login-required="no" href="/checkout/{{ tier.name|lower|replace(' ', '-') }}">Continue to checkout <span>↗</span></a>
+          {% else %}
+            <a class="tier-button tier-checkout" data-checkout-base="/checkout/{{ tier.name|lower|replace(' ', '-') }}" data-login-required="yes" href="/login">Sign in to purchase <span>↗</span></a>
+          {% endif %}
+        {% else %}
+          <button class="tier-button tier-unavailable" type="button" disabled>Checkout unavailable <span>🔒</span></button>
+        {% endif %}
+      </article>
+      {% endfor %}
+    </div>
+    <p class="disclaimer"><strong>Billing:</strong> Monthly subscriptions renew each month. One-time purchases grant access for 30 days and do not renew. In-game benefits are subject to the server integration being configured and working.</p>
+    {% if not paypal_configured %}<p class="disclaimer"><strong>Checkout:</strong> Membership payments are currently disabled until the payment provider and webhook are configured. No payment can be taken yet.</p>{% endif %}
+  </section>
+
+  <section class="store-bottom">
+    <div class="eyebrow">MORE IN THE STORE</div>
+    <h2>Find what you need.</h2>
+    <div class="store-bottom-links">
+      <a href="/points-shop">Bloodpoints packages <span>↗</span></a>
+      <a href="/donate">Make a donation <span>↗</span></a>
+    </div>
+  </section>
+</main>
+<footer>
+  <a class="brand" href="/">BLOOD<span>FANG</span><small>STORE</small></a>
+  <span>Digital store · The Isle: Evrima</span>
+  <nav class="legal-links"><a href="/imprint">Legal Notice</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="/withdrawal">Withdrawal & Cancellation</a></nav>
+</footer>
 <script>
 (() => {
-  const gate = document.getElementById('welcome-gate');
-  const enter = document.getElementById('enter-site');
-  const closeGate = () => {
-    gate.classList.add('welcome-gate-hidden');
-    document.body.classList.remove('welcome-locked');
-    window.setTimeout(() => gate.remove(), 450);
-  };
-  enter.addEventListener('click', closeGate);
-
-  // Keep the selected billing option in the destination, including through Discord login.
   document.querySelectorAll('.tier').forEach((card) => {
     const select = card.querySelector('.purchase-choice');
     const button = card.querySelector('.tier-checkout');
@@ -74,10 +106,6 @@
     };
     select.addEventListener('change', updateCheckoutLink);
     updateCheckoutLink();
-  });
-
-  document.addEventListener('keydown', (event) => {
-    if (event.key === 'Enter' && document.body.classList.contains('welcome-locked')) closeGate();
   });
 })();
 </script>
