@@ -1069,24 +1069,42 @@ def health():
 SHOPLOG_WEBHOOK_URL = os.environ.get("SHOPLOG_WEBHOOK_URL", "").strip()
 
 def send_shop_log(title, user_id, tier_name, purchase_type, provider, provider_ref, expires_at, status):
+    """Post a clear, premium-looking purchase receipt to the private Discord shop-log channel."""
     if not SHOPLOG_WEBHOOK_URL:
         app.logger.info("Shop logging is not configured. Run /shoplog and set SHOPLOG_WEBHOOK_URL on the website service.")
         return
-    expiry_text = f"<t:{int(expires_at)}:F>" if expires_at else "Not set"
+
+    tier = next((item for item in TIERS if item["name"].casefold() == str(tier_name).casefold()), None)
+    price_text = f"€{tier['price']}" if tier else "—"
+    points_text = f"{tier['points']} Bloodpoints" if tier else "—"
+    storage_text = f"{tier['storage']} slots" if tier else "—"
+    is_active = "active" in str(status).casefold() or "extended" in str(status).casefold()
+    expiry_text = f"<t:{int(expires_at)}:F>  •  <t:{int(expires_at)}:R>" if expires_at else "No expiry recorded"
+    purchase_label = str(purchase_type).replace("_", " ").title()
+    provider_label = str(provider).replace("_", " ").upper()
+    reference = str(provider_ref)
+
     payload = {
         "embeds": [{
-            "title": f"🛒 {title}",
-            "color": 10027008,
+            "title": "🩸  BLOODFANG  •  PURCHASE CONFIRMED",
+            "description": (
+                f"**{str(tier_name)} Membership** has been recorded.\n"
+                "The transaction details and access status are listed below."
+            ),
+            "color": 0x35C46A if is_active else 0xD94A4A,
             "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
             "fields": [
-                {"name": "Member", "value": f"<@{user_id}> (ID: {user_id})", "inline": False},
-                {"name": "Membership", "value": str(tier_name)[:1024], "inline": True},
-                {"name": "Purchase type", "value": str(purchase_type).replace("_", " ").title()[:1024], "inline": True},
-                {"name": "Payment provider", "value": str(provider).upper()[:1024], "inline": True},
-                {"name": "Status", "value": str(status)[:1024], "inline": True},
-                {"name": "Access expires", "value": expiry_text, "inline": False},
-                {"name": "Reference", "value": str(provider_ref)[:1000], "inline": False},
+                {"name": "👤  Customer", "value": f"<@{user_id}>\nID: {user_id}", "inline": True},
+                {"name": "👑  Membership", "value": f"**{tier_name}**\n{points_text}", "inline": True},
+                {"name": "💶  Price", "value": f"**{price_text}**", "inline": True},
+                {"name": "🧾  Purchase type", "value": purchase_label, "inline": True},
+                {"name": "💳  Payment method", "value": provider_label, "inline": True},
+                {"name": "📌  Status", "value": f"**{status}**", "inline": True},
+                {"name": "📦  Storage benefit", "value": storage_text, "inline": True},
+                {"name": "⏳  Access valid until", "value": expiry_text, "inline": True},
+                {"name": "🔖  Transaction reference", "value": reference[:1000], "inline": False},
             ],
+            "footer": {"text": "BLOODFANG Store • Automated purchase log"},
         }],
         "allowed_mentions": {"parse": []},
     }
