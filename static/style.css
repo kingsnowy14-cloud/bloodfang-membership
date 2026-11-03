@@ -88,3 +88,27 @@ a:focus-visible,button:focus-visible,select:focus-visible{outline:2px solid #ff6
 .rank-table tbody tr:hover{background:#211317}
 .ranks-note{margin-top:16px}
 @media(max-width:560px){.donation-ranks{padding:35px 16px 50px}.rank-table th,.rank-table td{padding:12px 10px}}
+
+
+/* Focused storefront layout */
+.brand{display:inline-flex;align-items:baseline;gap:7px;white-space:nowrap}
+.brand small{font:800 9px Inter,Arial,sans-serif;letter-spacing:3px;color:#ed5363;border-left:1px solid #594047;padding-left:8px}
+.store-hero{min-height:440px;display:flex;flex-direction:column;align-items:flex-start;justify-content:center}
+.store-hero h1 span{color:var(--red)}
+.store-actions{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.store-secondary{display:inline-flex;align-items:center;gap:22px;padding:14px 18px;color:#f5e9eb;text-decoration:none;border:1px solid #68404a;font-size:12px;font-weight:800;border-radius:3px}
+.store-secondary:hover{background:#211317;border-color:var(--red)}
+.store-categories{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;padding-top:50px;padding-bottom:25px}
+.store-category{position:relative;display:flex;flex-direction:column;gap:10px;min-height:180px;padding:24px;text-decoration:none;color:var(--white);border:1px solid var(--line);background:linear-gradient(145deg,#191619,#100e10);transition:border-color .2s,transform .2s}
+.store-category:hover{border-color:#8c3a49;transform:translateY(-3px)}
+.category-symbol{font:800 34px 'Barlow Condensed',sans-serif;color:#d72b3f}
+.store-category strong{font:800 30px/1 'Barlow Condensed',sans-serif;text-transform:uppercase}
+.store-category small{font-size:11px;color:var(--muted);line-height:1.6}
+.store-bottom{text-align:center;padding:72px 20px 82px;border-top:1px solid #261e21;background:radial-gradient(ellipse at center,#241016 0,transparent 65%)}
+.store-bottom h2{font:800 clamp(42px,6vw,60px)/1 'Barlow Condensed',sans-serif;text-transform:uppercase;margin:14px 0 24px}
+.store-bottom-links{display:flex;justify-content:center;gap:12px;flex-wrap:wrap}
+.store-bottom-links a{padding:14px 18px;color:#f5e9eb;text-decoration:none;border:1px solid #68404a;font-size:12px;font-weight:800}
+.store-bottom-links a:hover{background:#211317;border-color:var(--red)}
+.navbtn.active{border-color:var(--red);background:#211317}
+.store-page .section#memberships{padding-top:55px}
+@media(max-width:760px){.store-categories{grid-template-columns:1fr;padding-top:35px}.store-category{min-height:145px}.store-hero{min-height:390px}.store-actions{align-items:stretch;flex-direction:column;max-width:300px}.store-actions .primary,.store-actions .store-secondary{justify-content:space-between}.store-bottom{padding:55px 18px}}
