@@ -31,10 +31,11 @@ gunicorn app:app --bind "0.0.0.0:${PORT:-8080}" --workers 1 --threads 4 --timeou
 WEB_PID=$!
 
 cleanup() {
-  echo "[startup] Stopping website and Discord bot..."
+  echo "[startup] Stopping website, Discord bot and backup scheduler..."
   kill "$WEB_PID" "$BOT_PID" "$BACKUP_PID" 2>/dev/null || true
   wait "$WEB_PID" 2>/dev/null || true
   wait "$BOT_PID" 2>/dev/null || true
+  wait "$BACKUP_PID" 2>/dev/null || true
 }
 trap cleanup EXIT INT TERM
 
