@@ -22,13 +22,17 @@ run_bot() {
 run_bot &
 BOT_PID=$!
 
+# Run the daily backup scheduler alongside the website and bot.
+python -u backup_to_github.py &
+BACKUP_PID=$!
+
 echo "[startup] Starting website with Gunicorn on port ${PORT:-8080}..."
 gunicorn app:app --bind "0.0.0.0:${PORT:-8080}" --workers 1 --threads 4 --timeout 120 &
 WEB_PID=$!
 
 cleanup() {
   echo "[startup] Stopping website and Discord bot..."
-  kill "$WEB_PID" "$BOT_PID" 2>/dev/null || true
+  kill "$WEB_PID" "$BOT_PID" "$BACKUP_PID" 2>/dev/null || true
   wait "$WEB_PID" 2>/dev/null || true
   wait "$BOT_PID" 2>/dev/null || true
 }
