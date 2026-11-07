@@ -128,8 +128,6 @@ POINT_PACKAGES = [
     ("150,000,000", "€230.00"),
     ("300,000,000", "€350.00"),
     ("500,000,000", "€500.00"),
-    ("750,000,000", "€750.00"),
-    ("1,000,000,000", "€1,000.00"),
 ]
 
 
@@ -386,7 +384,7 @@ async def membership(ctx):
         fields.append((
             f"🩸 {name} — {price}",
             f"**Monthly subscription:** {price}/month\n"
-            f"**One-time purchase:** {price} (permanent role)\n"
+            f"**One-time purchase:** {price} (30 days, no renewal)\n"
             f"**Listed benefits:** {points}; {storage}.",
         ))
     await send_offer_dm(
