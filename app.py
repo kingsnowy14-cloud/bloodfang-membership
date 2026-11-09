@@ -413,18 +413,19 @@ async def create_paypal_donation(user_id, amount, display_name, anonymous):
 
 # Lifetime donation thresholds in cents, ordered highest first.
 DONATION_RANKS = [
-    (100000, "👑 Blood God"),
-    (75000, "🌑 Dark Matter"),
-    (50000, "🟣 Amethyst"),
-    (30000, "⚫ Obsidian"),
-    (20000, "🔴 Ruby"),
-    (15000, "🟢 Emerald"),
-    (10000, "🔷 Sapphire"),
-    (7500, "💠 Diamond"),
-    (5000, "💎 Platinum"),
-    (2500, "🥇 Gold"),
-    (1500, "🥈 Silver"),
-    (600, "🥉 Bronze"),
+    (90000, "👑 Blood God"),
+    (72500, "🌑 Dark Matter"),
+    (57500, "🟣 Amethyst"),
+    (42500, "⚫ Obsidian"),
+    (31000, "🔴 Ruby"),
+    (23500, "🟢 Emerald"),
+    (17500, "🔷 Sapphire"),
+    (12500, "💠 Diamond"),
+    (8500, "💎 Platinum"),
+    (5500, "🥇 Gold"),
+    (3500, "🥈 Silver"),
+    (1900, "🥉 Bronze"),
+    (900, "💸 Donator"),
 ]
 
 
@@ -454,9 +455,9 @@ async def assign_donation_rank(user_id, total_cents):
         current_ids = set(member.get("roles", []))
 
         # The Blood God role is also the ticket-priority role. Only grant it
-        # when the confirmed lifetime donation total reaches €1,000.
+        # when the confirmed lifetime donation total reaches €900.
         ticket_priority_role_id = "1565090381178077368"
-        if int(total_cents) >= 100000:
+        if int(total_cents) >= 90000:
             ticket_priority_role = next((r for r in roles if r.get("id") == ticket_priority_role_id), None)
             if ticket_priority_role is None:
                 raise RuntimeError(f"Blood God / ticket-priority role {ticket_priority_role_id} was not found in the Discord server.")
@@ -517,18 +518,19 @@ def _discord_api(method, path, payload=None):
 
 def _donation_leaderboard_payload():
     rank_rows = [
-        ("🥉 Bronze", "€6–14", "+2 Slots"),
-        ("🥈 Silver", "€15–24", "+3 Slots"),
-        ("🥇 Gold", "€25–49", "+4 Slots"),
-        ("💎 Platinum", "€50–74", "+5 Slots"),
-        ("💠 Diamond", "€75–99", "+6 Slots"),
-        ("🔷 Sapphire", "€100–149", "+7 Slots"),
-        ("🟢 Emerald", "€150–199", "+8 Slots"),
-        ("🔴 Ruby", "€200–299", "+9 Slots"),
-        ("⚫ Obsidian", "€300–499", "+10 Slots"),
-        ("🟣 Amethyst", "€500–749", "+12 Slots"),
-        ("🌑 Dark Matter", "€750–999", "+14 Slots"),
-        ("👑 Blood God", "€1.000+", "+16 Slots + Ticket-Priorität"),
+        ("💸 Donator", "€9–18", "+1 Slot"),
+        ("🥉 Bronze", "€19–34", "+2 Slots"),
+        ("🥈 Silver", "€35–54", "+3 Slots"),
+        ("🥇 Gold", "€55–84", "+4 Slots"),
+        ("💎 Platinum", "€85–124", "+5 Slots"),
+        ("💠 Diamond", "€125–174", "+6 Slots"),
+        ("🔷 Sapphire", "€175–234", "+7 Slots"),
+        ("🟢 Emerald", "€235–309", "+8 Slots"),
+        ("🔴 Ruby", "€310–424", "+9 Slots"),
+        ("⚫ Obsidian", "€425–574", "+10 Slots"),
+        ("🟣 Amethyst", "€575–724", "+12 Slots"),
+        ("🌑 Dark Matter", "€725–899", "+14 Slots"),
+        ("👑 Blood God", "€900+", "+16 Slots + Ticket-Priorität"),
     ]
     ranks_text = "\\n".join(f"{name} — **{price}** → {bonus}" for name, price, bonus in rank_rows)
     with db_connect() as db:
