@@ -8,7 +8,7 @@ A separate membership website for the BLOODFANG community for The Isle: Evrima. 
 - Discord OAuth2 login using the `identify` scope
 - Session-backed login and logout
 - Health endpoint at `/health`
-- PayPal and membership payments are **not implemented or enabled**
+- Stripe checkout code is present; live payments stay disabled until the Stripe secret key, webhook signing secret, and public base URL are configured
 - In-game Bloodpoints and storage benefits are displayed as proposed and must not be promised until the server integration supports them
 
 ## Run locally
@@ -51,16 +51,14 @@ Only set variables on this new service that it needs. Do not change the existing
 
 ## Membership tiers
 
-| Rank | Monthly price | Proposed Bloodpoints/day | Proposed storage |
+| Rank | Monthly price | Listed Bloodpoints/day | Listed storage |
 |---|---:|---:|---:|
-| FANGBORN | €2.99 | 10,000 | 4 |
 | STALKER | €4.99 | 25,000 | 5 |
-| RAVAGER | €7.99 | 50,000 | 6 |
 | WARLORD | €12.99 | 100,000 | 8 |
 | APEX | €19.99 | 200,000 | 9 |
 | BLOOD EMPEROR | €29.99 | 350,000 | 10 |
 | BLOOD TITAN | €50.00 | 1,000,000 | 13 |
-| BLOOD GOD | €100.00 | 1,600,000 | 20 |
+| BLOOD GOD | €120.00 | 2,000,000 | 20 |
 
 ## Security and scope
 
@@ -91,7 +89,7 @@ Until this checklist is reviewed and all placeholders are completed, keep paymen
 
 The repository also includes `bot.py`, which responds to these commands in a server and sends the offer lists to the command user's DMs:
 
-- `!membership` — all eight membership ranks, monthly prices, one-time prices, and listed benefits.
+- `!membership` — all six membership ranks, monthly prices, one-time prices, and listed benefits.
 - `!pointshop` — the same eight points packages shown on the website:
     - 2,500,000 points — €10
   - 6,500,000 points — €25
@@ -102,7 +100,7 @@ The repository also includes `bot.py`, which responds to these commands in a ser
   - 500,000,000 points — €500
   - 750,000,000 points — €750
   
-The website `/points-shop` displays the same package amounts. Checkout and automatic delivery are still disabled until payment and point-delivery integration is implemented.
+The website `/points-shop` and the bot `!pointshop` command display the same seven packages. The €5 / 750,000-point package has been removed. Point-pack checkout and automatic delivery remain disabled until payment and point-delivery integration is implemented.
 
 ### Run the Discord bot on Railway
 
