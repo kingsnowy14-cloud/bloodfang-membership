@@ -132,19 +132,19 @@ POINT_PACKAGES = [
 ]
 
 DONATION_RANK_INFO = [
-    ("💸 Donator", "€9–18", "+1 Slot"),
-    ("🥉 Bronze", "€19–34", "+2 Slots"),
-    ("🥈 Silver", "€35–54", "+3 Slots"),
-    ("🥇 Gold", "€55–84", "+4 Slots"),
-    ("💎 Platinum", "€85–124", "+5 Slots"),
-    ("💠 Diamond", "€125–174", "+6 Slots"),
-    ("🔷 Sapphire", "€175–234", "+7 Slots"),
-    ("🟢 Emerald", "€235–309", "+8 Slots"),
-    ("🔴 Ruby", "€310–424", "+9 Slots"),
-    ("⚫ Obsidian", "€425–574", "+10 Slots"),
-    ("🟣 Amethyst", "€575–724", "+12 Slots"),
-    ("🌑 Dark Matter", "€725–899", "+14 Slots"),
-    ("👑 Blood God", "€900+", "+16 Slots + Ticket-Priorität"),
+    ("💸 Donator", "€9", "+1 Slot"),
+    ("🥉 Bronze", "€19", "+2 Slots"),
+    ("🥈 Silver", "€35", "+3 Slots"),
+    ("🥇 Gold", "€55", "+4 Slots"),
+    ("💎 Platinum", "€85", "+5 Slots"),
+    ("💠 Diamond", "€125", "+6 Slots"),
+    ("🔷 Sapphire", "€175", "+7 Slots"),
+    ("🟢 Emerald", "€235", "+8 Slots"),
+    ("🔴 Ruby", "€310", "+9 Slots"),
+    ("⚫ Obsidian", "€425", "+10 Slots"),
+    ("🟣 Amethyst", "€575", "+12 Slots"),
+    ("🌑 Dark Matter", "€725", "+14 Slots"),
+    ("👑 Blood God", "€900", "+16 Slots + Ticket-Priorität"),
 ]
 
 
