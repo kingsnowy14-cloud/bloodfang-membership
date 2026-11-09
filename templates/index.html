@@ -62,7 +62,7 @@
           <div><span>Storage slots</span><strong>{{ tier.storage }}</strong></div>
           <div><span>Discord role</span><strong>Included</strong></div>
         </div>
-        {% if paypal_configured %}
+        {% if stripe_configured %}
           {% if user %}
             <a class="tier-button tier-checkout" data-checkout-base="/checkout/{{ tier.name|lower|replace(' ', '-') }}" data-login-required="no" href="/checkout/{{ tier.name|lower|replace(' ', '-') }}">Continue to checkout <span>↗</span></a>
           {% else %}
@@ -75,7 +75,7 @@
       {% endfor %}
     </div>
     <p class="disclaimer"><strong>Billing:</strong> Monthly subscriptions renew each month. One-time purchases grant access for 30 days and do not renew. In-game benefits are subject to the server integration being configured and working.</p>
-    {% if not paypal_configured %}<p class="disclaimer"><strong>Checkout:</strong> Membership payments are currently disabled until the payment provider and webhook are configured. No payment can be taken yet.</p>{% endif %}
+    {% if not stripe_configured %}<p class="disclaimer"><strong>Checkout:</strong> Membership payments are currently disabled until the payment provider and webhook are configured. No payment can be taken yet.</p>{% endif %}
   </section>
 
   <section class="store-bottom">
