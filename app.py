@@ -381,8 +381,8 @@ def donate_checkout():
         amount = round(float(request.form.get("amount", "").replace(",", ".")), 2)
     except (ValueError, TypeError):
         amount = 0
-    if amount < 6 or amount > 1000:
-        return render_template("message.html", title="Invalid amount", message="Choose between EUR 6 and EUR 1,000."), 400
+    if amount < 9 or amount > 1000:
+        return render_template("message.html", title="Invalid amount", message="Choose between EUR 9 and EUR 1,000."), 400
     if not STRIPE_CHECKOUT_CONFIGURED:
         return render_template("message.html", title="Donation checkout not configured", message="Configure STRIPE_SECRET_KEY and PUBLIC_BASE_URL in Railway. No payment was taken."), 503
     anonymous = request.form.get("anonymous") == "yes"
