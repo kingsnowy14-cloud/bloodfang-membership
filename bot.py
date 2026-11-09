@@ -120,7 +120,6 @@ MEMBERSHIPS = [
 ]
 
 POINT_PACKAGES = [
-    ("750,000", "€5.00"),
     ("2,500,000", "€10.00"),
     ("6,500,000", "€25.00"),
     ("16,500,000", "€55.00"),
@@ -416,7 +415,6 @@ async def pointshop(ctx):
 @commands.guild_only()
 async def donation_ranks(ctx):
     fields = [
-        ("🩸 Donator — €1–5", "Storage bonus at this lifetime donation total: **+1 slot**"),
         ("🥉 Bronze — €6–14", "Total storage bonus: **+2 slots**"),
         ("🥈 Silver — €15–24", "Total storage bonus: **+3 slots**"),
         ("🥇 Gold — €25–49", "Total storage bonus: **+4 slots**"),
@@ -943,7 +941,6 @@ async def update_donation_leaderboard():
             channel = await bot.fetch_channel(int(DONATION_CHANNEL_ID))
 
         rank_rows = [
-            ("🩸 Donator", "€1–5", "+1 Slot"),
             ("🥉 Bronze", "€6–14", "+2 Slots"),
             ("🥈 Silver", "€15–24", "+3 Slots"),
             ("🥇 Gold", "€25–49", "+4 Slots"),
