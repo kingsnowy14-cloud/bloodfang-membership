@@ -92,9 +92,8 @@ Until this checklist is reviewed and all placeholders are completed, keep paymen
 The repository also includes `bot.py`, which responds to these commands in a server and sends the offer lists to the command user's DMs:
 
 - `!membership` — all eight membership ranks, monthly prices, one-time prices, and listed benefits.
-- `!pointshop` — all points packages and prices:
-  - 750,000 points — €5
-  - 2,500,000 points — €10
+- `!pointshop` — the same eight points packages shown on the website:
+    - 2,500,000 points — €10
   - 6,500,000 points — €25
   - 16,500,000 points — €55
   - 45,000,000 points — €115
@@ -102,8 +101,7 @@ The repository also includes `bot.py`, which responds to these commands in a ser
   - 300,000,000 points — €350
   - 500,000,000 points — €500
   - 750,000,000 points — €750
-  - 1,000,000,000 points — €1,000
-
+  
 The website `/points-shop` displays the same package amounts. Checkout and automatic delivery are still disabled until payment and point-delivery integration is implemented.
 
 ### Run the Discord bot on Railway
