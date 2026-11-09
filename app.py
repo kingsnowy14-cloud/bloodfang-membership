@@ -18,9 +18,10 @@ PUBLIC_BASE_URL = os.environ.get("PUBLIC_BASE_URL", "").rstrip("/")
 DISCORD_BOT_TOKEN = os.environ.get("DISCORD_BOT_TOKEN", "")
 DISCORD_GUILD_ID = os.environ.get("DISCORD_GUILD_ID", "1561027077984227371")
 DISCORD_NOTIFICATION_USER_ID = os.environ.get("DISCORD_NOTIFICATION_USER_ID", "1493110334280564807").strip()
-ENABLE_TEST_PURCHASES = os.environ.get("ENABLE_TEST_PURCHASES", "true").lower() == "true"
+ENABLE_TEST_PURCHASES = os.environ.get("ENABLE_TEST_PURCHASES", "false").lower() == "true"
 STRIPE_SECRET_KEY = os.environ.get("STRIPE_SECRET_KEY", "")
 STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
+STRIPE_CHECKOUT_CONFIGURED = bool(STRIPE_SECRET_KEY and STRIPE_WEBHOOK_SECRET and PUBLIC_BASE_URL)
 
 TIERS = [
     {"name":"STALKER","emoji":"🦴","price":"4,99","points":"25.000","storage":"5"},
@@ -44,7 +45,7 @@ POINT_PACKAGES = [
 @app.get("/")
 def index():
     return render_template("index.html", tiers=TIERS, points=POINT_PACKAGES, user=session.get("discord_user"),
-                           paypal_configured=bool(STRIPE_SECRET_KEY))
+                           stripe_configured=STRIPE_CHECKOUT_CONFIGURED)
 
 @app.get("/points-shop")
 def points_shop():
@@ -123,7 +124,7 @@ def checkout(tier_name):
     if not tier:
         return render_template("message.html", title="Rank not found", message="This membership rank does not exist."), 404
     if request.method == "GET":
-        if not STRIPE_SECRET_KEY and not ENABLE_TEST_PURCHASES:
+        if not STRIPE_CHECKOUT_CONFIGURED and not ENABLE_TEST_PURCHASES:
             return render_template("message.html", title="Checkout is not ready yet",
                                    message="Stripe is not configured. No payment has been taken."), 503
         requested_type = request.args.get("purchase_type", "subscription")
@@ -132,7 +133,7 @@ def checkout(tier_name):
         session["checkout_csrf"] = secrets.token_urlsafe(24)
         return render_template("message.html", title="Membership checkout", tier=tier, user=user,
                                test_mode=ENABLE_TEST_PURCHASES, csrf_token=session["checkout_csrf"],
-                               payment_mode=True, purchase_type=requested_type, stripe_enabled=bool(STRIPE_SECRET_KEY))
+                               payment_mode=True, purchase_type=requested_type, stripe_enabled=STRIPE_CHECKOUT_CONFIGURED)
     submitted_token = request.form.get("csrf_token", "")
     saved_token = session.pop("checkout_csrf", "")
     if not submitted_token or not saved_token or not secrets.compare_digest(submitted_token, saved_token):
@@ -156,7 +157,7 @@ def checkout(tier_name):
                                message=f"TEST ONLY: {tier['name']} role assigned. No payment was taken.")
     if provider != "stripe":
         return render_template("message.html", title="Invalid payment provider", message="Only Stripe payments are supported."), 400
-    if not STRIPE_SECRET_KEY or not PUBLIC_BASE_URL:
+    if not STRIPE_CHECKOUT_CONFIGURED:
         return render_template("message.html", title="Stripe checkout unavailable", message="Configure STRIPE_SECRET_KEY and PUBLIC_BASE_URL in Railway. No payment was taken."), 503
     try:
         checkout_url = create_stripe_membership_checkout(user, tier, purchase_type)
@@ -382,7 +383,7 @@ def donate_checkout():
         amount = 0
     if amount < 6 or amount > 1000:
         return render_template("message.html", title="Invalid amount", message="Choose between EUR 6 and EUR 1,000."), 400
-    if not (STRIPE_SECRET_KEY and PUBLIC_BASE_URL):
+    if not STRIPE_CHECKOUT_CONFIGURED:
         return render_template("message.html", title="Donation checkout not configured", message="Configure STRIPE_SECRET_KEY and PUBLIC_BASE_URL in Railway. No payment was taken."), 503
     anonymous = request.form.get("anonymous") == "yes"
     display_name = "__anonymous__" if anonymous else (user.get("global_name") or user.get("username") or "Donator")
@@ -1056,7 +1057,7 @@ def withdrawal():
 def health():
     return {
         "status": "ok",
-        "paypal_configured": bool(STRIPE_SECRET_KEY),
+        "stripe_configured": STRIPE_CHECKOUT_CONFIGURED,
         "discord_roles_configured": bool(DISCORD_BOT_TOKEN and DISCORD_GUILD_ID),
         "database_path": DB_PATH,
     }
