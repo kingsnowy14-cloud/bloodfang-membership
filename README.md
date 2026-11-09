@@ -4,7 +4,7 @@ A separate membership website for the BLOODFANG community for The Isle: Evrima. 
 
 ## Current status
 
-- Membership landing page with eight proposed tiers
+- Membership landing page with six membership tiers
 - Discord OAuth2 login using the `identify` scope
 - Session-backed login and logout
 - Health endpoint at `/health`
@@ -30,24 +30,21 @@ python app.py
 
 ## Railway deployment
 
-1. Create a new Railway service connected only to this repository.
-2. Set the start command to `gunicorn app:app --bind 0.0.0.0:$PORT` if Railway does not detect the Procfile.
-3. Generate a public domain for this service.
-4. Set `SESSION_SECRET` to a long random secret.
-5. Set `DISCORD_CLIENT_ID` and `DISCORD_CLIENT_SECRET` from the existing Discord application.
-6. Set `DISCORD_REDIRECT_URI` to `https://YOUR-RAILWAY-DOMAIN/callback`.
-7. In Discord Developer Portal → OAuth2, register that exact redirect URL.
-8. Redeploy and test `/health`, then the Discord login.
+The production Railway service is already connected to this repository on `main`. Its start command is `bash start.sh`, which starts the Flask website, the Discord bot, and the scheduled GitHub backup worker together. The persistent Railway volume is mounted at `/data` for the SQLite databases and backups.
 
-Only set variables on this new service that it needs. Do not change the existing bot or website service variables.
+Production URL: https://bloodfang-membership.up.railway.app/
+
+Keep these settings on the existing service; do not create a duplicate service for the bot.
 
 ## Environment variables
 
-- `DISCORD_CLIENT_ID`: Discord application ID
-- `DISCORD_CLIENT_SECRET`: Discord OAuth2 client secret
-- `DISCORD_REDIRECT_URI`: exact OAuth callback URL ending in `/callback`
-- `SESSION_SECRET`: private random session-signing secret
-- `PUBLIC_BASE_URL`: public URL for this website (optional for the current starter)
+- `DISCORD_CLIENT_ID`, `DISCORD_CLIENT_SECRET`, `DISCORD_REDIRECT_URI`: Discord OAuth2 login
+- `DISCORD_BOT_TOKEN`, `DISCORD_GUILD_ID`: Discord bot and role assignment
+- `SESSION_SECRET`: private session-signing secret
+- `PUBLIC_BASE_URL`: public website URL, currently https://bloodfang-membership.up.railway.app
+- `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`: required together for verified Stripe checkout
+- `ENABLE_TEST_PURCHASES`: must remain `false` in production
+- `SHOP_API_KEY`, `GITHUB_BACKUP_TOKEN`: private bot API and backup integration
 
 ## Membership tiers
 
@@ -64,8 +61,9 @@ Only set variables on this new service that it needs. Do not change the existing
 
 - Never commit bot tokens, Discord secrets, PayPal secrets, or session secrets.
 - OAuth state is checked on callback to reduce CSRF risk.
-- The website currently only identifies a Discord user; it does not grant roles or process payments.
-- PayPal integration will be added separately later, starting with sandbox mode and verified webhooks.
+- Stripe checkout is implemented, but the website only exposes payment forms when the secret key, webhook signing secret, and public base URL are all present.
+- Membership roles are assigned only after a verified Stripe payment webhook. Test purchases are disabled in production.
+- The points shop is a preview only; point checkout and automatic delivery are not implemented.
 
 
 ## Legal launch checklist (Germany / international audience)
