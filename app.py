@@ -32,7 +32,6 @@ TIERS = [
 ]
 
 POINT_PACKAGES = [
-    {"points":"750.000","price":"5,00","featured":False},
     {"points":"2.500.000","price":"10,00","featured":False},
     {"points":"6.500.000","price":"25,00","featured":False},
     {"points":"16.500.000","price":"55,00","featured":True},
@@ -381,8 +380,8 @@ def donate_checkout():
         amount = round(float(request.form.get("amount", "").replace(",", ".")), 2)
     except (ValueError, TypeError):
         amount = 0
-    if amount < 1 or amount > 1000:
-        return render_template("message.html", title="Invalid amount", message="Choose between EUR 1 and EUR 1,000."), 400
+    if amount < 6 or amount > 1000:
+        return render_template("message.html", title="Invalid amount", message="Choose between EUR 6 and EUR 1,000."), 400
     if not (STRIPE_SECRET_KEY and PUBLIC_BASE_URL):
         return render_template("message.html", title="Donation checkout not configured", message="Configure STRIPE_SECRET_KEY and PUBLIC_BASE_URL in Railway. No payment was taken."), 503
     anonymous = request.form.get("anonymous") == "yes"
@@ -425,7 +424,6 @@ DONATION_RANKS = [
     (2500, "🥇 Gold"),
     (1500, "🥈 Silver"),
     (600, "🥉 Bronze"),
-    (100, "🩸 Donator"),
 ]
 
 
@@ -518,7 +516,6 @@ def _discord_api(method, path, payload=None):
 
 def _donation_leaderboard_payload():
     rank_rows = [
-        ("🩸 Donator", "€1–5", "+1 Slot"),
         ("🥉 Bronze", "€6–14", "+2 Slots"),
         ("🥈 Silver", "€15–24", "+3 Slots"),
         ("🥇 Gold", "€25–49", "+4 Slots"),
