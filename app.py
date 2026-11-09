@@ -367,7 +367,7 @@ def donate_page():
                              ORDER BY total_cents DESC, donation_count DESC, display_name COLLATE NOCASE ASC LIMIT 5""").fetchall()
     leaderboard = [{"rank": i + 1, "name": ("Anonymous donor" if row["display_name"] == "__anonymous__" else row["display_name"]),
                     "total": f"{row['total_cents'] / 100:.2f}"} for i, row in enumerate(rows)]
-    return render_template("donate.html", user=session.get("discord_user"), csrf_token=session.get("donate_csrf"), paypal_configured=bool(STRIPE_SECRET_KEY), leaderboard=leaderboard)
+    return render_template("donate.html", user=session.get("discord_user"), csrf_token=session.get("donate_csrf"), stripe_configured=STRIPE_CHECKOUT_CONFIGURED, leaderboard=leaderboard)
 
 @app.post("/donate/checkout")
 def donate_checkout():
