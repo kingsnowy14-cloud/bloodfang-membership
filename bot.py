@@ -48,7 +48,8 @@ async def help_command(ctx):
         value=(
             "`!membership` — Membership ranks and prices via DM\n"
             "`!pointshop` — Points packages and prices via DM\n"
-            "`!donat` — Donation ranks and storage bonuses via DM\n"
+            "`!donat` / `!donation` — Donation ranks and storage bonuses via DM\n"
+            "`/donationranks` — Show all donation ranks and bonuses\n"
             "`/mymembership` — Check your membership"
         ),
         inline=False,
@@ -88,7 +89,8 @@ async def help_slash(interaction: discord.Interaction):
         value=(
             "`!membership` — Membership ranks and prices via DM\n"
             "`!pointshop` — Points packages and prices via DM\n"
-            "`!donat` — Donation ranks and bonuses via DM\n"
+            "`!donat` / `!donation` — Donation ranks and bonuses via DM\n"
+            "`/donationranks` — Show all donation ranks and bonuses\n"
             "`/mymembership` — Check your membership\n"
             "`/donat` — Configure the donation leaderboard"
         ),
@@ -127,6 +129,22 @@ POINT_PACKAGES = [
     ("150,000,000", "€230.00"),
     ("300,000,000", "€350.00"),
     ("500,000,000", "€500.00"),
+]
+
+DONATION_RANK_INFO = [
+    ("💸 Donator", "€9–18", "+1 Slot"),
+    ("🥉 Bronze", "€19–34", "+2 Slots"),
+    ("🥈 Silver", "€35–54", "+3 Slots"),
+    ("🥇 Gold", "€55–84", "+4 Slots"),
+    ("💎 Platinum", "€85–124", "+5 Slots"),
+    ("💠 Diamond", "€125–174", "+6 Slots"),
+    ("🔷 Sapphire", "€175–234", "+7 Slots"),
+    ("🟢 Emerald", "€235–309", "+8 Slots"),
+    ("🔴 Ruby", "€310–424", "+9 Slots"),
+    ("⚫ Obsidian", "€425–574", "+10 Slots"),
+    ("🟣 Amethyst", "€575–724", "+12 Slots"),
+    ("🌑 Dark Matter", "€725–899", "+14 Slots"),
+    ("👑 Blood God", "€900+", "+16 Slots + Ticket-Priorität"),
 ]
 
 
@@ -411,30 +429,33 @@ async def pointshop(ctx):
     )
 
 
-@bot.command(name="donat")
+@bot.command(name="donat", aliases=["donation", "donations", "donator", "donationranks"])
 @commands.guild_only()
 async def donation_ranks(ctx):
     fields = [
-        ("🥉 Bronze — €6–14", "Total storage bonus: **+2 slots**"),
-        ("🥈 Silver — €15–24", "Total storage bonus: **+3 slots**"),
-        ("🥇 Gold — €25–49", "Total storage bonus: **+4 slots**"),
-        ("💎 Platinum — €50–74", "Total storage bonus: **+5 slots**"),
-        ("💠 Diamond — €75–99", "Total storage bonus: **+6 slots**"),
-        ("🔷 Sapphire — €100–149", "Total storage bonus: **+7 slots**"),
-        ("🟢 Emerald — €150–199", "Total storage bonus: **+8 slots**"),
-        ("🔴 Ruby — €200–299", "Total storage bonus: **+9 slots**"),
-        ("⚫ Obsidian — €300–499", "Total storage bonus: **+10 slots**"),
-        ("🟣 Amethyst — €500–749", "Total storage bonus: **+12 slots**"),
-        ("🌑 Dark Matter — €750–999", "Total storage bonus: **+14 slots**"),
-        ("👑 Blood God — €1,000+", "Total storage bonus: **+16 slots**\n**Extra reward:** Ticket priority."),
+        (f"{name} — {price}", f"Total storage bonus: **{bonus}**")
+        for name, price, bonus in DONATION_RANK_INFO
     ]
     await send_offer_dm(
         ctx,
         "BLOODFANG Donation Ranks",
-        "Your lifetime confirmed donation total determines your rank. Storage bonuses are total bonuses added to your existing membership storage; they are not stacked again at every rank-up. Blood God also receives ticket priority from €1,000.",
+        "Your lifetime confirmed donation total determines your rank. Storage bonuses are total bonuses added to your existing membership storage; they are not stacked again at every rank-up. Blood God also receives ticket priority from €900.",
         fields,
         "Donate through the official BLOODFANG website: " + os.environ.get("PUBLIC_BASE_URL", "https://bloodfang-membership.up.railway.app").rstrip("/") + "/donate",
     )
+
+
+@bot.tree.command(name="donationranks", description="Show BLOODFANG donation ranks, prices and storage bonuses")
+async def donation_ranks_slash(interaction: discord.Interaction):
+    embed = discord.Embed(
+        title="🩸 BLOODFANG Donation Ranks",
+        description="Your confirmed lifetime donation total determines your rank. Storage bonuses are total bonuses, not cumulative.",
+        color=discord.Color.dark_red(),
+    )
+    for name, price, bonus in DONATION_RANK_INFO:
+        embed.add_field(name=f"{name} — {price}", value=f"Storage bonus: **{bonus}**", inline=True)
+    embed.set_footer(text="Donate through the official BLOODFANG website.")
+    await interaction.response.send_message(embed=embed, ephemeral=True)
 
 
 @tasks.loop(minutes=1)
@@ -940,20 +961,7 @@ async def update_donation_leaderboard():
         if channel is None:
             channel = await bot.fetch_channel(int(DONATION_CHANNEL_ID))
 
-        rank_rows = [
-            ("🥉 Bronze", "€6–14", "+2 Slots"),
-            ("🥈 Silver", "€15–24", "+3 Slots"),
-            ("🥇 Gold", "€25–49", "+4 Slots"),
-            ("💎 Platinum", "€50–74", "+5 Slots"),
-            ("💠 Diamond", "€75–99", "+6 Slots"),
-            ("🔷 Sapphire", "€100–149", "+7 Slots"),
-            ("🟢 Emerald", "€150–199", "+8 Slots"),
-            ("🔴 Ruby", "€200–299", "+9 Slots"),
-            ("⚫ Obsidian", "€300–499", "+10 Slots"),
-            ("🟣 Amethyst", "€500–749", "+12 Slots"),
-            ("🌑 Dark Matter", "€750–999", "+14 Slots"),
-            ("👑 Blood God", "€1,000+", "+16 slots + ticket priority"),
-        ]
+        rank_rows = DONATION_RANK_INFO
         ranks_text = "\n".join(f"{name} — **{price}** → {bonus}" for name, price, bonus in rank_rows)
 
         db_dir = os.path.dirname(os.path.abspath(MEMBERSHIP_DB_PATH))
