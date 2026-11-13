@@ -67,7 +67,8 @@
       document.querySelectorAll('body *').forEach(el => {
         const id = key(el), old = legacyKey(el);
         const image = images[id] || images[old], position = layout[old] || layout[id], style = Object.assign({}, styles[id] || {}, styles[old] || {});
-        const content = Object.prototype.hasOwnProperty.call(changes, id) ? changes[id] : changes[old];
+        const pageContent = changes['__visual_page_content__:' + page + '|' + id];
+        const content = pageContent !== undefined ? pageContent : (Object.prototype.hasOwnProperty.call(changes, id) ? changes[id] : changes[old]);
         if (el.tagName === 'IMG' && image) el.src = image;
         if (el.dataset.tierPrice && prices[el.dataset.tierPrice]) el.textContent = '€' + prices[el.dataset.tierPrice];
         if (position) el.style.transform = 'translate(' + position.x + 'px,' + position.y + 'px)';
