@@ -5,13 +5,13 @@
   <meta name="theme-color" content="#0c0b0d">
   <meta name="description" content="BLOODFANG Store — memberships, Bloodpoints and donations for The Isle: Evrima.">
   <title>BLOODFANG STORE | The Isle: Evrima</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css', v='20261113-no-image-dashes') }}">
 {% if visual_editor_admin %}<meta name="visual-editor-csrf" content="{{ visual_editor_csrf }}">{% endif %}
 </head>
 <body class="store-page">
 <header class="topbar">
   <a class="brand" href="/">BLOOD<span>FANG</span><small>STORE</small></a>
-  {% if visual_editor_admin %}<button class="navbtn visual-edit-launch" id="visualEditLaunch" type="button">✎ Website bearbeiten</button>{% endif %}
+  {% if visual_editor_admin %}<button class="navbtn visual-edit-launch" id="visualEditLaunch" type="button">✎ Edit website</button>{% endif %}
   <nav class="main-nav" aria-label="Store navigation">
     <a class="navbtn" href="#memberships">Memberships</a>
     <a class="navbtn" href="/points-shop">Bloodpoints</a>
@@ -112,5 +112,5 @@
 })();
 </script>
 <script src="{{ url_for('static', filename='visual-edits.js', v='20261113-persisted-render1') }}" defer></script>
-{% if visual_editor_admin %}<script src="{{ url_for('static', filename='visual-editor.js', v='20261113-editor-background-pick5') }}" defer></script>{% endif %}
+{% if visual_editor_admin %}<script src="{{ url_for('static', filename='visual-editor.js', v='20261113-english-editor1') }}" defer></script>{% endif %}
 </body></html>
