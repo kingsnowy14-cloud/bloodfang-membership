@@ -5,6 +5,7 @@
   <meta name="theme-color" content="#0c0b0d">
   <title>BLOODFANG | Bloodpoints Store</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+{% if visual_editor_admin %}<meta name="visual-editor-csrf" content="{{ visual_editor_csrf }}">{% endif %}
 </head>
 <body>
 <header class="topbar">
@@ -27,7 +28,7 @@
       {% for pack in points %}
       <article class="point-card {% if pack.featured %}point-featured{% endif %}">
         <div class="eyebrow">BLOODFANG POINTS</div><h3>{{ pack.points }}</h3>
-        <p>Points package · one-time purchase</p><div class="point-price">€{{ pack.price }}</div>
+        <p>Points package · one-time purchase</p><div class="point-price"><span data-point-price="{{ loop.index0 }}">€{{ pack.price }}</span></div>
         <div class="point-note">One-time package</div>
         <button class="tier-button tier-unavailable" type="button" disabled aria-disabled="true">Purchases coming soon <span>⌛</span></button>
       </article>
@@ -37,4 +38,5 @@
   </section>
 </main>
 <footer><a class="brand" href="/">BLOOD<span>FANG</span><small>STORE</small></a><span>Bloodpoints store · one-time packages</span><nav class="legal-links"><a href="/imprint">Legal Notice</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="/withdrawal">Withdrawal & Cancellation</a></nav></footer>
+{% if visual_editor_admin %}<script src="{{ url_for('static', filename='visual-editor.js') }}" defer></script>{% endif %}
 </body></html>
