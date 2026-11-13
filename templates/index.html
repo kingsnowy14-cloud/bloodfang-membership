@@ -26,8 +26,8 @@
 <main>
   <section class="hero store-hero">
     <div class="eyebrow">THE ISLE: EVRIMA · BLOODFANG STORE</div>
-    <h1>SUPPORT THE PACK.<br><span>GET YOUR REWARDS.</span></h1>
-    <p>Browse Bloodfang memberships, Bloodpoints packages and one-time donations — all in one place.</p>
+    <h1>{{ hero_title.split('\n')[0] }}<br><span>{{ hero_title.split('\n')[1] if '\n' in hero_title else '' }}</span></h1>
+    <p>{{ hero_description }}</p>
     <div class="store-actions">
       <a class="primary" href="#memberships">Shop memberships <span>↓</span></a>
       <a class="store-secondary" href="/points-shop">Browse Bloodpoints <span>↗</span></a>
