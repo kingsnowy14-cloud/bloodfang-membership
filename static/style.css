@@ -238,3 +238,8 @@ body.visual-editing .visual-editor-panel .ve-head:active{cursor:grabbing!importa
 body.visual-editing [contenteditable="true"]{cursor:text!important}
 body.visual-editing img{cursor:pointer!important}
 .ve-cursor-mark{display:none!important}
+
+/* Uploaded image controls: selectable, resizable by width, and draggable in editor mode */
+.visual-editor-added-image{max-width:none;object-fit:contain;cursor:move!important;}
+.visual-editor-logo{display:inline-block;vertical-align:middle;margin:0 8px;max-width:100%;height:auto;}
+body.visual-logo-picking .brand,body.visual-logo-picking .hero-mark,body.visual-logo-picking main section,body.visual-logo-picking .store-bottom,body.visual-logo-picking header,body.visual-logo-picking footer{outline:2px dashed #f3bd4f!important;outline-offset:3px!important;cursor:crosshair!important;}
