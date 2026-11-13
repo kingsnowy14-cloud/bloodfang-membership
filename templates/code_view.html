@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <title>Website source viewer | BLOODFANG</title>
+  <style>
+    *{box-sizing:border-box}body{margin:0;background:#0c0b0d;color:#eee;font:15px/1.5 Arial,sans-serif}
+    header{position:sticky;top:0;z-index:2;display:flex;gap:16px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:16px 22px;background:#171317;border-bottom:1px solid #49313a}
+    .brand{color:#fff;text-decoration:none;font-weight:900;letter-spacing:.08em}.brand span{color:#e34b5d}
+    .actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap}a,button,select{font:inherit}
+    a.back,select{border:1px solid #59404a;border-radius:8px;padding:9px 12px;background:#211b21;color:#fff;text-decoration:none}
+    main{max-width:1400px;margin:24px auto;padding:0 18px}
+    .notice{margin-bottom:14px;color:#c8b8bf}.filebar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+    .filebar label{font-weight:700}.filebar select{min-width:min(420px,100%)}
+    .code-shell{border:1px solid #392a32;border-radius:10px;overflow:auto;background:#100e11;max-height:calc(100vh - 190px)}
+    pre{margin:0;padding:18px;color:#e9dfe4;font:13px/1.65 ui-monospace,SFMono-Regular,Consolas,monospace;white-space:pre;tab-size:4;user-select:text}
+    .readonly{font-size:12px;color:#d9a9b4;border:1px solid #70414c;padding:5px 9px;border-radius:99px}
+  </style>
+</head>
+<body>
+<header>
+  <a class="brand" href="/">BLOOD<span>FANG</span> · SOURCE</a>
+  <div class="actions"><span class="readonly">READ ONLY · VIEW ONLY</span><a class="back" href="/">← Back to website</a></div>
+</header>
+<main>
+  <p class="notice">Website source code viewer. You can read and select the code, but this page has no editing or save function. It is not GitHub.</p>
+  <form class="filebar" method="get" action="/admin/code">
+    <label for="file">Website file</label>
+    <select id="file" name="file" onchange="this.form.submit()">
+      {% for file in allowed_files %}
+      <option value="{{ file }}" {% if file == selected_file %}selected{% endif %}>{{ file }}</option>
+      {% endfor %}
+    </select>
+  </form>
+  <div class="code-shell" aria-label="Read-only website source code"><pre>{{ source_code }}</pre></div>
+</main>
+</body>
+</html>
