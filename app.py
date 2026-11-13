@@ -279,6 +279,42 @@ def visual_editor_api():
     return jsonify({"ok": True, "saved": len(clean), "prices": len(clean_prices), "positions": len(clean_layout), "githubSynced": github_synced})
 
 
+@app.get("/api/visual-edits-public")
+def visual_edits_public_api():
+    """Serve the latest saved visual edits to every visitor, not only the editor admin."""
+    backup = {}
+    try:
+        with open(os.path.join(app.root_path, "static", "visual-edits.json"), "r", encoding="utf-8") as backup_file:
+            backup = json.load(backup_file)
+        if not isinstance(backup, dict):
+            backup = {}
+    except (OSError, TypeError, ValueError):
+        backup = {}
+
+    def public_saved_value(db_key, backup_key):
+        with db_connect() as db:
+            row = db.execute("SELECT value FROM app_settings WHERE key=?", (db_key,)).fetchone()
+        if row:
+            try:
+                value = json.loads(row["value"])
+                if isinstance(value, (dict, list)):
+                    return value
+            except (TypeError, ValueError):
+                pass
+        value = backup.get(backup_key, {})
+        return value if isinstance(value, (dict, list)) else {}
+
+    response = jsonify({
+        "content": public_saved_value("visual_editor_content", "content"),
+        "tierPrices": public_saved_value("tier_prices", "tierPrices"),
+        "layout": public_saved_value("visual_editor_layout", "layout"),
+        "images": public_saved_value("visual_editor_images", "images"),
+        "styles": public_saved_value("visual_editor_styles", "styles"),
+    })
+    response.headers["Cache-Control"] = "no-store, max-age=0"
+    return response
+
+
 @app.post("/api/visual-editor/upload")
 def visual_editor_upload():
     if not is_visual_editor_admin():
