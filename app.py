@@ -29,10 +29,10 @@ STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
 STRIPE_CHECKOUT_CONFIGURED = bool(STRIPE_SECRET_KEY and STRIPE_WEBHOOK_SECRET and PUBLIC_BASE_URL)
 
 TIERS = [
-    {"name":"STALKER","emoji":"🦴","price":"4,99","points":"25.000","storage":"3"},
-    {"name":"WARLORD","emoji":"👑","price":"12,99","points":"100.000","storage":"5"},
-    {"name":"APEX","emoji":"☠️","price":"19,99","points":"200.000","storage":"6"},
-    {"name":"BLOOD EMPEROR","emoji":"🔥","price":"29,99","points":"350.000","storage":"8"},
+    {"name":"STALKER","emoji":"🦴","price":"5,00","points":"25.000","storage":"3"},
+    {"name":"WARLORD","emoji":"👑","price":"15,00","points":"100.000","storage":"5"},
+    {"name":"APEX","emoji":"☠️","price":"20,00","points":"200.000","storage":"6"},
+    {"name":"BLOOD EMPEROR","emoji":"🔥","price":"30,00","points":"350.000","storage":"8"},
     {"name":"BLOOD TITAN","emoji":"💀","price":"50,00","points":"1.000.000","storage":"12"},
     {"name":"BLOOD GOD","emoji":"👹","price":"120,00","points":"2.000.000","storage":"20"},
 ]
@@ -74,7 +74,7 @@ def get_tiers():
             saved_prices = json.loads(row["value"])
             for tier in tiers:
                 value = saved_prices.get(tier["name"])
-                legacy_prices = {"STALKER": "5,00", "WARLORD": "15,00", "APEX": "20,00", "BLOOD EMPEROR": "30,00", "BLOOD TITAN": "50,00", "BLOOD GOD": "100,00"}
+                legacy_prices = {"STALKER": "4,99", "WARLORD": "12,99", "APEX": "19,99", "BLOOD EMPEROR": "29,99", "BLOOD TITAN": "50,00", "BLOOD GOD": "120,00"}
                 if value == legacy_prices.get(tier["name"]):
                     continue
                 if isinstance(value, str) and __import__("re").fullmatch(r"\d{1,4},\d{2}", value):
