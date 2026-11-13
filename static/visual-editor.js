@@ -34,7 +34,8 @@
       nodes.forEach(el => {
         if (!eligible(el)) return;
         const key = elementKey(el);
-        if (Object.prototype.hasOwnProperty.call(changes, key)) el.textContent = changes[key];\n        if (el.dataset.tierPrice && tierPrices[el.dataset.tierPrice]) el.textContent = '€' + tierPrices[el.dataset.tierPrice];
+        if (Object.prototype.hasOwnProperty.call(changes, key)) el.textContent = changes[key];
+        if (el.dataset.tierPrice && tierPrices[el.dataset.tierPrice]) el.textContent = '€' + tierPrices[el.dataset.tierPrice];
       });
     });
   }
@@ -49,7 +50,8 @@
   function finishCurrent() {
     if (!current) return;
     const key = current.dataset.visualKey, value = current.textContent;
-    if (key && changes[key] !== value) { changes[key] = value; dirty = true; status.textContent = 'Nicht gespeichert'; }\n    if (current.dataset.tierPrice) { const match = value.match(/(\\d{1,4},\\d{2})/); if (match) { tierPrices[current.dataset.tierPrice] = match[1]; dirty = true; } }
+    if (key && changes[key] !== value) { changes[key] = value; dirty = true; status.textContent = 'Nicht gespeichert'; }
+    if (current.dataset.tierPrice) { const match = value.match(/(\d{1,4},\d{2})/); if (match) { tierPrices[current.dataset.tierPrice] = match[1]; dirty = true; } }
     current.removeAttribute('contenteditable'); current = null;
   }
   function startEditing(el) {
