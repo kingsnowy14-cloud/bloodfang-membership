@@ -162,7 +162,13 @@ def visual_editor_api():
             images = json.loads(image_row["value"]) if image_row else {}
         except (TypeError, ValueError):
             images = {}
-        return jsonify({"changes": changes, "tierPrices": tier_prices, "layout": layout, "images": images, "csrf": session["visual_editor_csrf"]})
+        with db_connect() as db:
+            style_row = db.execute("SELECT value FROM app_settings WHERE key='visual_editor_styles'").fetchone()
+        try:
+            styles = json.loads(style_row["value"]) if style_row else {}
+        except (TypeError, ValueError):
+            styles = {}
+        return jsonify({"changes": changes, "tierPrices": tier_prices, "layout": layout, "images": images, "styles": styles, "csrf": session["visual_editor_csrf"]})
 
     payload = request.get_json(silent=True) or {}
     submitted = str(payload.get("csrf", ""))
@@ -185,6 +191,22 @@ def visual_editor_api():
         if not isinstance(key, str) or len(key) > 600 or not isinstance(value, str) or not value.startswith("/uploads/"):
             return jsonify({"error": "invalid image mapping"}), 400
         clean_images[key] = value[:500]
+    styles = payload.get("styles", {})
+    if not isinstance(styles, dict) or len(styles) > 500:
+        return jsonify({"error": "invalid styles"}), 400
+    clean_styles = {}
+    allowed_style_keys = {"color", "background", "fontSize", "fontFamily", "fontWeight", "fontStyle", "textDecoration", "textAlign"}
+    for key, style in styles.items():
+        if not isinstance(key, str) or len(key) > 600 or not isinstance(style, dict):
+            return jsonify({"error": "invalid style"}), 400
+        clean_style = {}
+        for name, value in style.items():
+            if name not in allowed_style_keys or not isinstance(value, str) or len(value) > 180:
+                return jsonify({"error": "invalid style property"}), 400
+            if name in {"color", "background"} and not all(c.isalnum() or c in "#(),.% -/" for c in value):
+                return jsonify({"error": "invalid color"}), 400
+            clean_style[name] = value
+        clean_styles[key] = clean_style
     layout = payload.get("layout", {})
     if not isinstance(layout, dict) or len(layout) > 500:
         return jsonify({"error": "invalid layout"}), 400
@@ -226,6 +248,18 @@ def visual_editor_api():
                 "INSERT INTO app_settings(key,value) VALUES('visual_editor_layout',?) "
                 "ON CONFLICT(key) DO UPDATE SET value=excluded.value",
                 (json.dumps(merged_layout, ensure_ascii=False),),
+            )
+        if clean_styles:
+            old_styles = db.execute("SELECT value FROM app_settings WHERE key='visual_editor_styles'").fetchone()
+            try:
+                merged_styles = json.loads(old_styles["value"]) if old_styles else {}
+            except (TypeError, ValueError):
+                merged_styles = {}
+            merged_styles.update(clean_styles)
+            db.execute(
+                "INSERT INTO app_settings(key,value) VALUES('visual_editor_styles',?) "
+                "ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+                (json.dumps(merged_styles, ensure_ascii=False),),
             )
         if clean_images:
             old_images = db.execute("SELECT value FROM app_settings WHERE key='visual_editor_images'").fetchone()
