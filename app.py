@@ -108,6 +108,28 @@ def inject_visual_editor():
     return {"visual_editor_admin": enabled, "visual_editor_csrf": token}
 
 
+@app.after_request
+def inject_visual_editor_on_every_page(response):
+    # Make the same admin editor available on every HTML page, not just the homepage.
+    if not is_visual_editor_admin() or response.mimetype != "text/html" or response.direct_passthrough:
+        return response
+    token = session.get("visual_editor_csrf") or secrets.token_urlsafe(32)
+    session["visual_editor_csrf"] = token
+    page = response.get_data(as_text=True)
+    if 'name="visual-editor-csrf"' not in page:
+        page = page.replace("</head>", '<meta name="visual-editor-csrf" content="' + html.escape(token, quote=True) + '"></head>', 1)
+    if "visual-editor.css" not in page:
+        page = page.replace("</head>", '<link rel="stylesheet" href="/static/visual-editor.css?v=shared-editor-20261113"></head>', 1)
+    if "visual-edits.js" not in page:
+        page = page.replace("</body>", '<script src="/static/visual-edits.js?v=shared-editor-20261113" defer></script></body>', 1)
+    if "visual-editor.js" not in page:
+        page = page.replace("</body>", '<script src="/static/visual-editor.js?v=shared-editor-20261113" defer></script></body>', 1)
+    if "/admin/website-statistics" not in page:
+        page = page.replace("</body>", '<a href="/admin/website-statistics" style="position:fixed;z-index:12000;top:62px;right:18px;background:#171216;color:#fff;border:1px solid #8b3447;border-radius:8px;padding:10px 13px;font:800 11px Arial;text-decoration:none">📊 Website stats</a></body>', 1)
+    response.set_data(page)
+    return response
+
+
 
 _visual_backup_lock = threading.Lock()
 
