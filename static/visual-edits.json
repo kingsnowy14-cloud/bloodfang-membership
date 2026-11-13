@@ -14,24 +14,24 @@
       "display": "none"
     },
     "__visual_global_overlay__:743d72e5-8df1-4709-83dc-1d0f202241df": {
-      "position": "absolute",
+      "display": "block",
+      "height": "auto",
       "left": "1046px",
+      "margin": "0",
+      "position": "absolute",
       "top": "63px",
       "width": "821px",
-      "height": "auto",
-      "margin": "0",
-      "zIndex": "20",
-      "display": "block"
+      "zIndex": "20"
     },
     "__visual_global_overlay__:815eea01-3165-4a94-b144-f71a50418b3c": {
-      "position": "absolute",
+      "display": "block",
+      "height": "auto",
       "left": "10px",
+      "margin": "0",
+      "position": "absolute",
       "top": "8px",
       "width": "66px",
-      "height": "auto",
-      "margin": "0",
-      "zIndex": "20",
-      "display": "block"
+      "zIndex": "20"
     }
   }
 }
