@@ -10,8 +10,8 @@
       "y": -45.0
     },
     "__visual_overlay__:fb6025c7-a466-45ee-ac64-29dea16cf8c9": {
-      "x": 946.0,
-      "y": -14.0
+      "x": 975.0,
+      "y": -69.0
     }
   },
   "images": {
@@ -34,12 +34,12 @@
     },
     "__visual_overlay__:fb6025c7-a466-45ee-ac64-29dea16cf8c9": {
       "display": "block",
-      "height": "549px",
+      "height": "547px",
       "left": "71px",
       "margin": "0",
       "position": "absolute",
       "top": "132px",
-      "width": "823px",
+      "width": "821px",
       "zIndex": "20"
     }
   }
