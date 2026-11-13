@@ -5,12 +5,12 @@
   },
   "tierPrices": {},
   "layout": {
-    "__visual_global_overlay__:b86752ad-06ad-41d6-b118-b9a415c47928": {
-      "x": -86.0,
-      "y": -7.0
-    },
     "/points-shop|img:1": {
       "x": -147.0,
+      "y": -7.0
+    },
+    "__visual_global_overlay__:b86752ad-06ad-41d6-b118-b9a415c47928": {
+      "x": -86.0,
       "y": -7.0
     }
   },
@@ -19,6 +19,10 @@
     "__visual_global_overlay__:b86752ad-06ad-41d6-b118-b9a415c47928": "/uploads/11382b3681b923f2a871e5deb8db41da.png"
   },
   "styles": {
+    "/points-shop|img:1": {
+      "height": "619px",
+      "width": "929px"
+    },
     "/points-shop|main:0/section:0/div:1": {
       "display": "none"
     },
@@ -42,15 +46,15 @@
       "margin": "0",
       "position": "absolute",
       "top": "67px",
-      "width": "929px",
+      "width": "840px",
       "zIndex": "20"
     },
     "__visual_page_hidden__:/donate|__visual_global_overlay__:b86752ad-06ad-41d6-b118-b9a415c47928": {
       "display": "none"
     },
-    "/points-shop|img:1": {
-      "width": "929px",
-      "height": "619px"
+    "/|img:1": {
+      "width": "840px",
+      "height": "560px"
     }
   }
 }
