@@ -1,6 +1,6 @@
 (() => {
   const page = location.pathname.replace(/\/$/, '') || '/';
-  const key = el => {
+  const elementPath = el => {
     const path = [];
     let node = el;
     while (node && node !== document.body) {
@@ -10,8 +10,10 @@
       path.unshift(node.tagName.toLowerCase() + ':' + siblings.indexOf(node));
       node = parent;
     }
-    return page + '|' + path.join('/');
+    return path.join('/');
   };
+  const key = el => '__visual_shared__|' + elementPath(el);
+  const legacyKey = el => page + '|' + elementPath(el);
   const safeHTML = value => {
     const doc = new DOMParser().parseFromString(String(value), 'text/html');
     const allowed = new Set(['B','STRONG','I','EM','U','S','SPAN','BR','FONT','IMG']);
@@ -61,14 +63,16 @@
       const images = data.images || {};
       const styles = data.styles || {};
       if (styles['__visual_global__']) { const g=styles['__visual_global__']; if(g.color)document.body.style.color=g.color; let tag=document.getElementById('ve-global-style'); if(!tag){tag=document.createElement('style');tag.id='ve-global-style';document.head.appendChild(tag);} tag.textContent=(g.color?'body *{color:'+g.color+'!important;}':'')+globalBackgroundCss(g.background); }
-      if (styles[key(document.body)]) Object.assign(document.body.style, styles[key(document.body)]);
+      if (styles[key(document.body)] || styles[legacyKey(document.body)]) Object.assign(document.body.style, styles[key(document.body)] || styles[legacyKey(document.body)]);
       document.querySelectorAll('body *').forEach(el => {
-        const id = key(el);
-        if (el.tagName === 'IMG' && images[id]) el.src = images[id];
+        const id = key(el), old = legacyKey(el);
+        const image = images[id] || images[old], position = layout[id] || layout[old], style = styles[id] || styles[old];
+        const content = Object.prototype.hasOwnProperty.call(changes, id) ? changes[id] : changes[old];
+        if (el.tagName === 'IMG' && image) el.src = image;
         if (el.dataset.tierPrice && prices[el.dataset.tierPrice]) el.textContent = '€' + prices[el.dataset.tierPrice];
-        if (layout[id]) el.style.transform = 'translate(' + layout[id].x + 'px,' + layout[id].y + 'px)';
-        if (styles[id] && typeof styles[id] === 'object') Object.assign(el.style, styles[id]);
-        if (Object.prototype.hasOwnProperty.call(changes, id) && !['IMG','BODY','MAIN','SECTION','HEADER','FOOTER','DIV','ARTICLE','ASIDE','NAV','UL','OL'].includes(el.tagName)) el.innerHTML = safeHTML(changes[id]);
+        if (position) el.style.transform = 'translate(' + position.x + 'px,' + position.y + 'px)';
+        if (style && typeof style === 'object') Object.assign(el.style, style);
+        if (content !== undefined && !['IMG','BODY','MAIN','SECTION','HEADER','FOOTER','DIV','ARTICLE','ASIDE','NAV','UL','OL'].includes(el.tagName)) el.innerHTML = safeHTML(content);
       });
       Object.keys(images).filter(id => id.startsWith('__visual_overlay__:') || id.startsWith('__visual_global_overlay__:')).forEach(id => {
         let img = document.querySelector('img[data-ve-overlay-key="' + id + '"]');
