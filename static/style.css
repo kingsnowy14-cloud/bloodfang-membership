@@ -273,3 +273,13 @@ body.visual-editing .hero-mark img.visual-editor-logo{display:inline-block!impor
 /* Editor-only drag handle for reliable mouse resizing across browsers. */
 .ve-image-resize-handle{display:none;position:fixed;z-index:100020;width:18px;height:18px;padding:0;border:2px solid #fff;border-radius:50%;background:#e43f5b;box-shadow:0 1px 8px #000b;cursor:nwse-resize!important;touch-action:none}
 body.visual-editing .ve-image-resize-handle{display:block}
+
+/* Uploaded images should never show editor-style dashed borders or outlines. */
+.visual-editor-added-image,
+body.visual-editing img,
+body.visual-editing img.visual-editor-added-image,
+body.visual-editing img.visual-editor-logo {
+  border: 0 !important;
+  outline: none !important;
+  outline-offset: 0 !important;
+}
