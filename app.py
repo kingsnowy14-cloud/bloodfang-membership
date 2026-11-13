@@ -44,8 +44,60 @@ POINT_PACKAGES = [
 
 @app.get("/")
 def index():
+    site_content = get_site_content()
     return render_template("index.html", tiers=TIERS, points=POINT_PACKAGES, user=session.get("discord_user"),
-                           stripe_configured=STRIPE_CHECKOUT_CONFIGURED)
+                           stripe_configured=STRIPE_CHECKOUT_CONFIGURED, **site_content)
+
+
+ADMIN_DISCORD_IDS = {
+    value.strip() for value in os.environ.get("ADMIN_DISCORD_IDS", "1493110334280564807").split(",")
+    if value.strip().isdigit()
+}
+
+
+def get_site_content():
+    defaults = {
+        "hero_title": "SUPPORT THE PACK.\\nGET YOUR REWARDS.",
+        "hero_description": "Browse Bloodfang memberships, Bloodpoints packages and one-time donations — all in one place.",
+    }
+    with db_connect() as db:
+        rows = db.execute("SELECT key, value FROM app_settings WHERE key IN ('hero_title','hero_description')").fetchall()
+    defaults.update({row["key"]: row["value"] for row in rows})
+    return defaults
+
+
+@app.route("/admin", methods=["GET", "POST"])
+def admin_editor():
+    user = session.get("discord_user")
+    if not user:
+        return redirect(url_for("login"))
+    if str(user.get("id", "")) not in ADMIN_DISCORD_IDS:
+        return render_template("message.html", title="Access denied",
+                               message="Your Discord account is not on the BLOODFANG admin allowlist."), 403
+
+    if request.method == "POST":
+        submitted = request.form.get("csrf_token", "")
+        saved = session.pop("admin_csrf", "")
+        if not submitted or not saved or not secrets.compare_digest(submitted, saved):
+            return render_template("message.html", title="Session expired",
+                                   message="Please reload the editor and try again."), 400
+        hero_title = request.form.get("hero_title", "").strip()[:180]
+        hero_description = request.form.get("hero_description", "").strip()[:500]
+        if not hero_title or not hero_description:
+            return render_template("message.html", title="Missing content",
+                                   message="The heading and description cannot be empty."), 400
+        with db_connect() as db:
+            db.executemany(
+                "INSERT INTO app_settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+                [("hero_title", hero_title), ("hero_description", hero_description)],
+            )
+        return redirect(url_for("admin_editor", saved="1"))
+
+    session["admin_csrf"] = secrets.token_urlsafe(32)
+    return render_template("admin.html", user=user, content=get_site_content(),
+                           csrf_token=session["admin_csrf"], saved=request.args.get("saved") == "1",
+                           admin_ids=sorted(ADMIN_DISCORD_IDS))
+
 
 @app.get("/points-shop")
 def points_shop():
