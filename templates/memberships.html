@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="en">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>My Purchases | BLOODFANG Store</title><link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">{% if visual_editor_admin %}<meta name="visual-editor-csrf" content="{{ visual_editor_csrf }}">{% endif %}
+{% if visual_editor_admin %}<meta name="visual-editor-csrf" content="{{ visual_editor_csrf }}">{% endif %}
 </head>
 <body><header class="topbar"><a class="brand" href="/">BLOOD<span>FANG</span><small>STORE</small></a><nav class="main-nav"><a class="navbtn" href="/">Memberships</a><a class="navbtn" href="/points-shop">Bloodpoints</a><a class="navbtn" href="/donate">Donations</a><a class="navbtn" href="/logout">Sign out</a></nav></header>
 <main class="section"><div class="eyebrow">BLOODFANG STORE · ACCOUNT</div><h1>My Purchases</h1><p>View your membership purchases and access periods.</p>
@@ -8,4 +9,5 @@
 {% if p.purchase_type == 'subscription' and p.status == 'active' and p.last_event != 'cancelled_by_member' %}<form class="cancel-form" method="post" action="/cancel-membership/{{ p.id }}" onsubmit="return confirm('Cancel automatic monthly renewal? Your role remains until your paid period ends.');"><button class="cancel-button" type="submit">Cancel automatic renewal</button></form>{% elif p.purchase_type == 'subscription' and p.last_event == 'cancelled_by_member' %}<p class="muted">Automatic renewal is cancelled. Your role will be removed when your paid access expires.</p>{% endif %}</article>{% endfor %}</div>{% else %}<p class="muted">No purchases have been recorded yet.</p>{% endif %}
 <p style="margin-top:2rem"><a class="primary" href="/">Back to store <span>↗</span></a></p></main>
 <footer><a class="brand" href="/">BLOOD<span>FANG</span><small>STORE</small></a><span>Purchase history</span><nav class="legal-links"><a href="/imprint">Legal Notice</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a></nav></footer>{% if visual_editor_admin %}<script src="{{ url_for('static', filename='visual-editor.js') }}" defer></script>{% endif %}
+{% if visual_editor_admin %}<script src="{{ url_for('static', filename='visual-editor.js') }}" defer></script>{% endif %}
 </body></html>
