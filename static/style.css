@@ -264,3 +264,8 @@ body.visual-editing img.visual-editor-logo{
 .visual-editor-logo-slot>img.visual-editor-logo{margin:0!important}
 .visual-editor-panel{resize:both!important}
 .visual-editor-panel.is-minimized{resize:none!important}
+
+/* Preset logo placement in the site header and hero. */
+body.visual-editing .topbar .visual-editor-logo-slot{display:inline-flex!important;align-items:center;vertical-align:middle;}
+body.visual-editing .topbar .brand img.visual-editor-logo{display:inline-block!important;width:34px!important;height:34px!important;max-width:34px!important;object-fit:contain!important;margin:0 9px 0 0!important;vertical-align:middle!important;}
+body.visual-editing .hero-mark img.visual-editor-logo{display:inline-block!important;max-width:120px!important;max-height:120px!important;object-fit:contain!important;}
