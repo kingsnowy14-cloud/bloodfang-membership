@@ -26,6 +26,10 @@
     "/points-shop|main:0/section:0/div:1": {
       "display": "none"
     },
+    "/|img:1": {
+      "height": "560px",
+      "width": "840px"
+    },
     "/|main:0/section:0/div:2": {
       "display": "none"
     },
@@ -52,9 +56,8 @@
     "__visual_page_hidden__:/donate|__visual_global_overlay__:b86752ad-06ad-41d6-b118-b9a415c47928": {
       "display": "none"
     },
-    "/|img:1": {
-      "width": "840px",
-      "height": "560px"
+    "/|main:0/section:0/div:1": {
+      "background": "linear-gradient(135deg, #251018, #0c0b0d)"
     }
   }
 }
