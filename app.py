@@ -1,5 +1,6 @@
 import os
 import json
+import base64
 import secrets
 import asyncio
 from urllib.parse import urlencode
@@ -93,6 +94,44 @@ def is_visual_editor_admin():
     return str(user.get("id", "")) in ADMIN_DISCORD_IDS
 
 
+@app.context_processor
+def inject_visual_editor():
+    enabled = is_visual_editor_admin()
+    token = ""
+    if enabled:
+        token = session.get("visual_editor_csrf") or secrets.token_urlsafe(32)
+        session["visual_editor_csrf"] = token
+    return {"visual_editor_admin": enabled, "visual_editor_csrf": token}
+
+
+
+def commit_visual_edits_to_github(changes, tier_prices, layout):
+    token = os.environ.get("GITHUB_TOKEN", "").strip()
+    if not token:
+        return False
+    repo = os.environ.get("GITHUB_REPOSITORY", "kingsnowy14-cloud/bloodfang-membership").strip()
+    path = "static/visual-edits.json"
+    api = f"https://api.github.com/repos/{repo}/contents/{path}"
+    body = json.dumps({"content": changes, "tierPrices": tier_prices, "layout": layout},
+                      ensure_ascii=False, indent=2).encode("utf-8")
+    headers = {"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json",
+               "X-GitHub-Api-Version": "2022-11-28", "User-Agent": "Bloodfang-Visual-Editor"}
+    sha = None
+    try:
+        req = urllib.request.Request(api, headers=headers)
+        with urllib.request.urlopen(req, timeout=12) as response:
+            sha = json.loads(response.read().decode("utf-8")).get("sha")
+    except urllib.error.HTTPError as exc:
+        if exc.code != 404:
+            raise
+    payload = {"message": "Update website content from visual editor", "content": base64.b64encode(body).decode("ascii"), "branch": "main"}
+    if sha:
+        payload["sha"] = sha
+    req = urllib.request.Request(api, data=json.dumps(payload).encode("utf-8"), headers={**headers, "Content-Type":"application/json"}, method="PUT")
+    with urllib.request.urlopen(req, timeout=20) as response:
+        return response.status in (200, 201)
+
+
 @app.route("/api/visual-editor", methods=["GET", "POST"])
 def visual_editor_api():
     if not is_visual_editor_admin():
@@ -104,8 +143,19 @@ def visual_editor_api():
             changes = json.loads(row["value"]) if row else {}
         except (TypeError, ValueError):
             changes = {}
+        with db_connect() as db:
+            price_row = db.execute("SELECT value FROM app_settings WHERE key='tier_prices'").fetchone()
+            layout_row = db.execute("SELECT value FROM app_settings WHERE key='visual_editor_layout'").fetchone()
+        try:
+            tier_prices = json.loads(price_row["value"]) if price_row else {}
+        except (TypeError, ValueError):
+            tier_prices = {}
+        try:
+            layout = json.loads(layout_row["value"]) if layout_row else {}
+        except (TypeError, ValueError):
+            layout = {}
         session["visual_editor_csrf"] = session.get("visual_editor_csrf") or secrets.token_urlsafe(32)
-        return jsonify({"changes": changes, "csrf": session["visual_editor_csrf"]})
+        return jsonify({"changes": changes, "tierPrices": tier_prices, "layout": layout, "csrf": session["visual_editor_csrf"]})
 
     payload = request.get_json(silent=True) or {}
     submitted = str(payload.get("csrf", ""))
@@ -120,6 +170,20 @@ def visual_editor_api():
         if not isinstance(key, str) or len(key) > 500 or not isinstance(value, str) or len(value) > 2000:
             return jsonify({"error": "invalid editor content"}), 400
         clean[key] = value
+    layout = payload.get("layout", {})
+    if not isinstance(layout, dict) or len(layout) > 500:
+        return jsonify({"error": "invalid layout"}), 400
+    clean_layout = {}
+    for key, position in layout.items():
+        if not isinstance(key, str) or len(key) > 600 or not isinstance(position, dict):
+            return jsonify({"error": "invalid position"}), 400
+        try:
+            x, y = float(position.get("x", 0)), float(position.get("y", 0))
+        except (TypeError, ValueError):
+            return jsonify({"error": "invalid position"}), 400
+        if abs(x) > 3000 or abs(y) > 3000:
+            return jsonify({"error": "position out of range"}), 400
+        clean_layout[key] = {"x": x, "y": y}
     tier_prices = payload.get("tierPrices", {})
     if not isinstance(tier_prices, dict) or len(tier_prices) > len(TIERS):
         return jsonify({"error": "invalid tier prices"}), 400
@@ -136,6 +200,18 @@ def visual_editor_api():
             "ON CONFLICT(key) DO UPDATE SET value=excluded.value",
             (json.dumps(clean, ensure_ascii=False),),
         )
+        if clean_layout:
+            old_layout = db.execute("SELECT value FROM app_settings WHERE key='visual_editor_layout'").fetchone()
+            try:
+                merged_layout = json.loads(old_layout["value"]) if old_layout else {}
+            except (TypeError, ValueError):
+                merged_layout = {}
+            merged_layout.update(clean_layout)
+            db.execute(
+                "INSERT INTO app_settings(key,value) VALUES('visual_editor_layout',?) "
+                "ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+                (json.dumps(merged_layout, ensure_ascii=False),),
+            )
         if clean_prices:
             existing_row = db.execute("SELECT value FROM app_settings WHERE key='tier_prices'").fetchone()
             try:
@@ -148,7 +224,12 @@ def visual_editor_api():
                 "ON CONFLICT(key) DO UPDATE SET value=excluded.value",
                 (json.dumps(merged_prices, ensure_ascii=False),),
             )
-    return jsonify({"ok": True, "saved": len(clean), "prices": len(clean_prices)})
+    try:
+        github_synced = commit_visual_edits_to_github(clean, merged_prices if clean_prices else {}, merged_layout if clean_layout else {})
+    except Exception:
+        app.logger.exception("Could not commit visual editor changes to GitHub main")
+        github_synced = False
+    return jsonify({"ok": True, "saved": len(clean), "prices": len(clean_prices), "positions": len(clean_layout), "githubSynced": github_synced})
 
 
 @app.route("/admin", methods=["GET", "POST"])
