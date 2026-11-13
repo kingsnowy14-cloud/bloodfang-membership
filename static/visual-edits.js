@@ -46,6 +46,7 @@
       const layout = data.layout || {};
       const images = data.images || {};
       const styles = data.styles || {};
+      if (styles['__visual_global__']) Object.assign(document.body.style, styles['__visual_global__']);
       if (styles[key(document.body)]) Object.assign(document.body.style, styles[key(document.body)]);
       document.querySelectorAll('body *').forEach(el => {
         const id = key(el);
@@ -55,7 +56,7 @@
         if (styles[id] && typeof styles[id] === 'object') Object.assign(el.style, styles[id]);
         if (Object.prototype.hasOwnProperty.call(changes, id) && !['IMG','BODY','MAIN','SECTION','HEADER','FOOTER','DIV','ARTICLE','ASIDE','NAV','UL','OL'].includes(el.tagName)) el.innerHTML = safeHTML(changes[id]);
       });
-      Object.keys(images).filter(id => id.startsWith('__visual_overlay__:')).forEach(id => {
+      Object.keys(images).filter(id => id.startsWith('__visual_overlay__:') || id.startsWith('__visual_global_overlay__:')).forEach(id => {
         let img = document.querySelector('img[data-ve-overlay-key="' + id + '"]');
         if (!img) {
           img = document.createElement('img');
