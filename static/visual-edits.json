@@ -49,6 +49,10 @@
     "/points-shop|main:0/section:0/div:1": {
       "display": "none"
     },
+    "/withdrawal|img:1": {
+      "height": "560px",
+      "width": "840px"
+    },
     "/|header:0/a:0/span:0/span:0/span:0/span:0/span:0/span:0/span:0/span:0/span:0/span:0/span:0/span:0/span:0/span:0/span:0/span:0/span:0/span:0/span:0/span:0/span:0/span:0/span:0/span:0/span:0": {
       "color": "#fff4f4"
     },
@@ -96,11 +100,14 @@
     "__visual_page_hidden__:/donate|__visual_global_overlay__:b86752ad-06ad-41d6-b118-b9a415c47928": {
       "display": "none"
     },
-    "/withdrawal|img:1": {
+    "__visual_page_hidden__:/withdrawal|__visual_global_overlay__:b86752ad-06ad-41d6-b118-b9a415c47928": {
+      "display": "none"
+    },
+    "/imprint|img:1": {
       "width": "840px",
       "height": "560px"
     },
-    "__visual_page_hidden__:/withdrawal|__visual_global_overlay__:b86752ad-06ad-41d6-b118-b9a415c47928": {
+    "__visual_page_hidden__:/imprint|__visual_global_overlay__:b86752ad-06ad-41d6-b118-b9a415c47928": {
       "display": "none"
     }
   }
