@@ -243,3 +243,23 @@ body.visual-editing img{cursor:pointer!important}
 .visual-editor-added-image{max-width:none;object-fit:contain;cursor:move!important;}
 .visual-editor-logo{display:inline-block;vertical-align:middle;margin:0 8px;max-width:100%;height:auto;}
 body.visual-logo-picking .brand,body.visual-logo-picking .hero-mark,body.visual-logo-picking main section,body.visual-logo-picking .store-bottom,body.visual-logo-picking header,body.visual-logo-picking footer{outline:2px dashed #f3bd4f!important;outline-offset:3px!important;cursor:default!important;}
+
+
+/* Word-like direct mouse resizing for uploaded pictures and logos */
+body.visual-editing img.visual-editor-added-image,
+body.visual-editing img.visual-editor-logo{
+  display:inline-block!important;
+  max-width:none!important;
+  min-width:40px;
+  min-height:30px;
+  height:auto;
+  overflow:auto;
+  resize:both;
+  object-fit:contain;
+  vertical-align:middle;
+  cursor:move!important;
+}
+.visual-editor-logo-slot{display:inline-flex!important;align-items:center;justify-content:flex-start;min-width:40px;min-height:30px;vertical-align:middle}
+.visual-editor-logo-slot>img.visual-editor-logo{margin:0!important}
+.visual-editor-panel{resize:both!important}
+.visual-editor-panel.is-minimized{resize:none!important}
