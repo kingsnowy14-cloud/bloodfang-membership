@@ -6,28 +6,28 @@
   "tierPrices": {},
   "layout": {},
   "images": {
-    "__visual_global_overlay__:e6e01c54-3390-4c2b-a8cf-91df16a6b91a": "/uploads/26167117b0394fcd7b8e209cc339d221.png",
-    "__visual_global_overlay__:1e488713-ff25-4bf8-b2a4-3abb0ac21632": "/uploads/bfcb5d1219cd9b61e1a301ce6daf5548.png"
+    "__visual_global_overlay__:1e488713-ff25-4bf8-b2a4-3abb0ac21632": "/uploads/bfcb5d1219cd9b61e1a301ce6daf5548.png",
+    "__visual_global_overlay__:a1172441-4444-4de6-a128-cf70c391438e": "/uploads/26167117b0394fcd7b8e209cc339d221.png"
   },
   "styles": {
     "/|main:0/section:0/div:2": {
       "display": "none"
     },
-    "__visual_global_overlay__:e6e01c54-3390-4c2b-a8cf-91df16a6b91a": {
+    "__visual_global_overlay__:1e488713-ff25-4bf8-b2a4-3abb0ac21632": {
+      "display": "block",
+      "height": "auto",
+      "left": "10px",
+      "margin": "0",
+      "position": "absolute",
+      "top": "8px",
+      "width": "66px",
+      "zIndex": "20"
+    },
+    "__visual_global_overlay__:a1172441-4444-4de6-a128-cf70c391438e": {
       "position": "absolute",
       "left": "1046px",
       "top": "63px",
       "width": "821px",
-      "height": "auto",
-      "margin": "0",
-      "zIndex": "20",
-      "display": "block"
-    },
-    "__visual_global_overlay__:1e488713-ff25-4bf8-b2a4-3abb0ac21632": {
-      "position": "absolute",
-      "left": "10px",
-      "top": "8px",
-      "width": "66px",
       "height": "auto",
       "margin": "0",
       "zIndex": "20",
