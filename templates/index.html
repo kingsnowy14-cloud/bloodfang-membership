@@ -28,7 +28,7 @@
 <main>
   <section class="hero store-hero">
     <div class="eyebrow">THE ISLE: EVRIMA · BLOODFANG STORE</div>
-    <h1>{{ hero_title.splitlines()[0] }}<br><span>{{ hero_title.splitlines()[1] if hero_title.splitlines()|length > 1 else '' }}</span></h1>
+    <h1><span>{{ hero_title.splitlines()[0] }}</span><br><span>{{ hero_title.splitlines()[1] if hero_title.splitlines()|length > 1 else '' }}</span></h1>
     <p>{{ hero_description }}</p>
     <div class="store-actions">
       <a class="primary" href="#memberships">Shop memberships <span>↓</span></a>
@@ -53,7 +53,7 @@
       <article class="tier {% if tier.name in ['APEX','BLOOD EMPEROR','BLOOD TITAN','BLOOD GOD'] %}elite{% endif %}">
         <div class="tier-top"><span class="emoji">{{ tier.emoji }}</span><span class="tier-index">{{ "%02d"|format(loop.index) }}</span></div>
         <h3>{{ tier.name }}</h3>
-        <div class="price">€{{ tier.price }}<small> / month</small></div>
+        <div class="price"><span>€{{ tier.price }}</span><small> / month</small></div>
         <label class="purchase-choice-label" for="purchase-{{ loop.index }}">Payment option</label>
         <select class="purchase-choice" id="purchase-{{ loop.index }}" data-base="/checkout/{{ tier.name|lower|replace(' ', '-') }}" aria-label="Payment option for {{ tier.name }}">
           <option value="subscription" selected>Monthly — €{{ tier.price }} / month</option>
