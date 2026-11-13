@@ -4,7 +4,12 @@
     "/|main:0/section:0/h1:0/span:1": ""
   },
   "tierPrices": {},
-  "layout": {},
+  "layout": {
+    "__visual_global_overlay__:b86752ad-06ad-41d6-b118-b9a415c47928": {
+      "x": -44.0,
+      "y": 2.0
+    }
+  },
   "images": {
     "__visual_global_overlay__:9d44cd9c-2dee-49a5-b134-69af417f1c76": "/uploads/bfcb5d1219cd9b61e1a301ce6daf5548.png",
     "__visual_global_overlay__:b86752ad-06ad-41d6-b118-b9a415c47928": "/uploads/11382b3681b923f2a871e5deb8db41da.png"
@@ -25,15 +30,18 @@
     },
     "__visual_global_overlay__:b86752ad-06ad-41d6-b118-b9a415c47928": {
       "display": "block",
-      "height": "559px",
+      "height": "592px",
       "left": "992px",
       "margin": "0",
       "position": "absolute",
       "top": "67px",
-      "width": "839px",
+      "width": "888px",
       "zIndex": "20"
     },
     "__visual_page_hidden__:/donate|__visual_global_overlay__:b86752ad-06ad-41d6-b118-b9a415c47928": {
+      "display": "none"
+    },
+    "/points-shop|main:0/section:0/div:1": {
       "display": "none"
     }
   }
