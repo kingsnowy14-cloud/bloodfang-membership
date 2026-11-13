@@ -49,7 +49,7 @@ def index():
     is_admin = bool(user and str(user.get("id", "")) in ADMIN_DISCORD_IDS)
     if is_admin:
         session["visual_editor_csrf"] = secrets.token_urlsafe(32)
-    return render_template("index.html", tiers=TIERS, points=POINT_PACKAGES, user=user,
+    return render_template("index.html", tiers=get_tiers(), points=POINT_PACKAGES, user=user,
                            is_admin=is_admin, editor_csrf=session.get("visual_editor_csrf", ""),
                            stripe_configured=STRIPE_CHECKOUT_CONFIGURED, **site_content)
 
@@ -58,6 +58,22 @@ ADMIN_DISCORD_IDS = {
     value.strip() for value in os.environ.get("ADMIN_DISCORD_IDS", "1493110334280564807").split(",")
     if value.strip().isdigit()
 }
+
+
+def get_tiers():
+    tiers = [dict(tier) for tier in TIERS]
+    with db_connect() as db:
+        row = db.execute("SELECT value FROM app_settings WHERE key='tier_prices'").fetchone()
+    if row:
+        try:
+            saved_prices = json.loads(row["value"])
+            for tier in tiers:
+                value = saved_prices.get(tier["name"])
+                if isinstance(value, str) and __import__("re").fullmatch(r"\\d{1,4},\\d{2}", value):
+                    tier["price"] = value
+        except (TypeError, ValueError):
+            pass
+    return tiers
 
 
 def get_site_content():
@@ -104,13 +120,29 @@ def visual_editor_api():
         if not isinstance(key, str) or len(key) > 500 or not isinstance(value, str) or len(value) > 2000:
             return jsonify({"error": "invalid editor content"}), 400
         clean[key] = value
+    tier_prices = payload.get("tierPrices", {})
+    if not isinstance(tier_prices, dict) or len(tier_prices) > len(TIERS):
+        return jsonify({"error": "invalid tier prices"}), 400
+    clean_prices = {}
+    for tier_name, price in tier_prices.items():
+        if tier_name not in {tier["name"] for tier in TIERS} or not isinstance(price, str):
+            return jsonify({"error": "invalid tier price"}), 400
+        if not __import__("re").fullmatch(r"\\d{1,4},\\d{2}", price):
+            return jsonify({"error": "price must use format 0,00"}), 400
+        clean_prices[tier_name] = price
     with db_connect() as db:
         db.execute(
             "INSERT INTO app_settings(key,value) VALUES('visual_editor_content',?) "
             "ON CONFLICT(key) DO UPDATE SET value=excluded.value",
             (json.dumps(clean, ensure_ascii=False),),
         )
-    return jsonify({"ok": True, "saved": len(clean)})
+        if clean_prices:
+            db.execute(
+                "INSERT INTO app_settings(key,value) VALUES('tier_prices',?) "
+                "ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+                (json.dumps(clean_prices, ensure_ascii=False),),
+            )
+    return jsonify({"ok": True, "saved": len(clean), "prices": len(clean_prices)})
 
 
 @app.route("/admin", methods=["GET", "POST"])
@@ -219,7 +251,7 @@ def checkout(tier_name):
     user = session.get("discord_user")
     if not user:
         return redirect(url_for("login"))
-    tier = next((t for t in TIERS if t["name"].lower().replace(" ", "-") == tier_name), None)
+    tier = next((t for t in get_tiers() if t["name"].lower().replace(" ", "-") == tier_name), None)
     if not tier:
         return render_template("message.html", title="Rank not found", message="This membership rank does not exist."), 404
     if request.method == "GET":
