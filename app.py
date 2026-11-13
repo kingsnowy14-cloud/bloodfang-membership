@@ -7,7 +7,8 @@ from urllib.parse import urlencode
 import urllib.request
 
 import aiohttp
-from flask import Flask, redirect, render_template, request, session, url_for, jsonify
+from flask import Flask, redirect, render_template, request, session, url_for, jsonify, send_from_directory
+from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SESSION_SECRET") or secrets.token_hex(32)
@@ -105,14 +106,14 @@ def inject_visual_editor():
 
 
 
-def commit_visual_edits_to_github(changes, tier_prices, layout):
+def commit_visual_edits_to_github(changes, tier_prices, layout, images=None):
     token = (os.environ.get("GITHUB_TOKEN") or os.environ.get("GITHUB_BACKUP_TOKEN", "")).strip()
     if not token:
         return False
     repo = os.environ.get("GITHUB_REPOSITORY", "kingsnowy14-cloud/bloodfang-membership").strip()
     path = "static/visual-edits.json"
     api = f"https://api.github.com/repos/{repo}/contents/{path}"
-    body = json.dumps({"content": changes, "tierPrices": tier_prices, "layout": layout},
+    body = json.dumps({"content": changes, "tierPrices": tier_prices, "layout": layout, "images": images or {}},
                       ensure_ascii=False, indent=2).encode("utf-8")
     headers = {"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json",
                "X-GitHub-Api-Version": "2022-11-28", "User-Agent": "Bloodfang-Visual-Editor"}
@@ -155,7 +156,12 @@ def visual_editor_api():
         except (TypeError, ValueError):
             layout = {}
         session["visual_editor_csrf"] = session.get("visual_editor_csrf") or secrets.token_urlsafe(32)
-        return jsonify({"changes": changes, "tierPrices": tier_prices, "layout": layout, "csrf": session["visual_editor_csrf"]})
+        image_row = db.execute("SELECT value FROM app_settings WHERE key='visual_editor_images'").fetchone()
+        try:
+            images = json.loads(image_row["value"]) if image_row else {}
+        except (TypeError, ValueError):
+            images = {}
+        return jsonify({"changes": changes, "tierPrices": tier_prices, "layout": layout, "images": images, "csrf": session["visual_editor_csrf"]})
 
     payload = request.get_json(silent=True) or {}
     submitted = str(payload.get("csrf", ""))
@@ -170,6 +176,14 @@ def visual_editor_api():
         if not isinstance(key, str) or len(key) > 500 or not isinstance(value, str) or len(value) > 2000:
             return jsonify({"error": "invalid editor content"}), 400
         clean[key] = value
+    images = payload.get("images", {})
+    if not isinstance(images, dict) or len(images) > 500:
+        return jsonify({"error": "invalid images"}), 400
+    clean_images = {}
+    for key, value in images.items():
+        if not isinstance(key, str) or len(key) > 600 or not isinstance(value, str) or not value.startswith("/uploads/"):
+            return jsonify({"error": "invalid image mapping"}), 400
+        clean_images[key] = value[:500]
     layout = payload.get("layout", {})
     if not isinstance(layout, dict) or len(layout) > 500:
         return jsonify({"error": "invalid layout"}), 400
@@ -212,6 +226,18 @@ def visual_editor_api():
                 "ON CONFLICT(key) DO UPDATE SET value=excluded.value",
                 (json.dumps(merged_layout, ensure_ascii=False),),
             )
+        if clean_images:
+            old_images = db.execute("SELECT value FROM app_settings WHERE key='visual_editor_images'").fetchone()
+            try:
+                merged_images = json.loads(old_images["value"]) if old_images else {}
+            except (TypeError, ValueError):
+                merged_images = {}
+            merged_images.update(clean_images)
+            db.execute(
+                "INSERT INTO app_settings(key,value) VALUES('visual_editor_images',?) "
+                "ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+                (json.dumps(merged_images, ensure_ascii=False),),
+            )
         if clean_prices:
             existing_row = db.execute("SELECT value FROM app_settings WHERE key='tier_prices'").fetchone()
             try:
@@ -225,11 +251,53 @@ def visual_editor_api():
                 (json.dumps(merged_prices, ensure_ascii=False),),
             )
     try:
-        github_synced = commit_visual_edits_to_github(clean, merged_prices if clean_prices else {}, merged_layout if clean_layout else {})
+        github_synced = commit_visual_edits_to_github(clean, merged_prices if clean_prices else {}, merged_layout if clean_layout else {}, merged_images if clean_images else {})
     except Exception:
         app.logger.exception("Could not commit visual editor changes to GitHub main")
         github_synced = False
     return jsonify({"ok": True, "saved": len(clean), "prices": len(clean_prices), "positions": len(clean_layout), "githubSynced": github_synced})
+
+
+@app.post("/api/visual-editor/upload")
+def visual_editor_upload():
+    if not is_visual_editor_admin():
+        return jsonify({"error": "forbidden"}), 403
+    submitted = str(request.form.get("csrf") or request.headers.get("X-Editor-CSRF") or "")
+    expected = str(session.get("visual_editor_csrf", ""))
+    if not submitted or not expected or not secrets.compare_digest(submitted, expected):
+        return jsonify({"error": "invalid csrf token"}), 400
+    uploaded = request.files.get("image")
+    if not uploaded or not uploaded.filename:
+        return jsonify({"error": "Bitte ein Bild auswählen."}), 400
+    allowed = {"png", "jpg", "jpeg", "webp", "gif"}
+    original = secure_filename(uploaded.filename)
+    extension = original.rsplit(".", 1)[-1].lower() if "." in original else ""
+    if extension not in allowed:
+        return jsonify({"error": "Erlaubt sind PNG, JPG, WEBP und GIF."}), 400
+    data = uploaded.read(8 * 1024 * 1024 + 1)
+    if len(data) > 8 * 1024 * 1024:
+        return jsonify({"error": "Maximal 8 MB pro Bild."}), 413
+    signatures = {
+        "png": data.startswith(bytes([137,80,78,71,13,10,26,10])),
+        "jpg": data.startswith(bytes([255,216,255])),
+        "jpeg": data.startswith(bytes([255,216,255])),
+        "gif": data.startswith((b"GIF87a", b"GIF89a")),
+        "webp": len(data) >= 12 and data[:4] == b"RIFF" and data[8:12] == b"WEBP",
+    }
+    if not signatures.get(extension):
+        return jsonify({"error": "Die Datei ist kein gültiges Bild."}), 400
+    upload_dir = "/data/uploads" if os.path.isdir("/data") else os.path.join(app.root_path, "static", "uploads")
+    os.makedirs(upload_dir, exist_ok=True)
+    filename = secrets.token_hex(16) + "." + extension
+    with open(os.path.join(upload_dir, filename), "wb") as target:
+        target.write(data)
+    return jsonify({"ok": True, "url": "/uploads/" + filename})
+
+
+@app.get("/uploads/<path:filename>")
+def visual_editor_uploaded_image(filename):
+    upload_dir = "/data/uploads" if os.path.isdir("/data") else os.path.join(app.root_path, "static", "uploads")
+    return send_from_directory(upload_dir, filename)
 
 
 @app.route("/admin", methods=["GET", "POST"])
