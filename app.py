@@ -106,7 +106,7 @@ def inject_visual_editor():
 
 
 def commit_visual_edits_to_github(changes, tier_prices, layout):
-    token = os.environ.get("GITHUB_TOKEN", "").strip()
+    token = (os.environ.get("GITHUB_TOKEN") or os.environ.get("GITHUB_BACKUP_TOKEN", "")).strip()
     if not token:
         return False
     repo = os.environ.get("GITHUB_REPOSITORY", "kingsnowy14-cloud/bloodfang-membership").strip()
