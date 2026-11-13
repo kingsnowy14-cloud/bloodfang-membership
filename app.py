@@ -429,6 +429,19 @@ def track_website_page_view():
             db.execute("""INSERT INTO website_page_views(day,path,views)
                 VALUES(date('now'),?,1)
                 ON CONFLICT(day,path) DO UPDATE SET views=views+1""", (path[:300],))
+            user = session.get("discord_user") or {}
+            discord_name = str(user.get("global_name") or user.get("username") or "").strip()
+            if discord_name:
+                db.execute("""CREATE TABLE IF NOT EXISTS website_visitor_events (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    visited_at TEXT NOT NULL,
+                    discord_name TEXT NOT NULL,
+                    path TEXT NOT NULL
+                )""")
+                db.execute(
+                    "INSERT INTO website_visitor_events(visited_at,discord_name,path) VALUES(?,?,?)",
+                    (time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime()), discord_name[:100], path[:300]),
+                )
     except Exception:
         app.logger.exception("Could not record website page view")
 
@@ -447,6 +460,17 @@ def website_statistics():
         today = db.execute("SELECT COALESCE(SUM(views),0) FROM website_page_views WHERE day=date('now')").fetchone()[0]
         daily = db.execute("SELECT day,SUM(views) FROM website_page_views GROUP BY day ORDER BY day DESC LIMIT 30").fetchall()
         pages = db.execute("SELECT path,SUM(views) AS views FROM website_page_views GROUP BY path ORDER BY views DESC LIMIT 20").fetchall()
+        db.execute("""CREATE TABLE IF NOT EXISTS website_visitor_events (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            visited_at TEXT NOT NULL,
+            discord_name TEXT NOT NULL,
+            path TEXT NOT NULL
+        )""")
+        visitors = db.execute("SELECT discord_name,visited_at,path FROM website_visitor_events ORDER BY id DESC LIMIT 200").fetchall()
+    visitor_rows = "".join(
+        f"<tr><td>{html.escape(str(name))}</td><td>{html.escape(str(stamp))} UTC</td><td>{html.escape(str(path))}</td></tr>"
+        for name,stamp,path in visitors
+    )
     rows = "".join(f"<tr><td>{html.escape(str(day))}</td><td>{int(count)}</td></tr>" for day,count in daily)
     page_rows = "".join(f"<tr><td>{html.escape(str(path))}</td><td>{int(count)}</td></tr>" for path,count in pages)
     document = f"""<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width">
@@ -460,8 +484,9 @@ def website_statistics():
     <div class="cards"><div class="card">Total page views<strong>{int(total)}</strong></div>
     <div class="card">Today<strong>{int(today)}</strong></div></div>
     <h2>Last 30 days</h2><table><tr><th>Date (UTC)</th><th>Page views</th></tr>{rows or '<tr><td colspan="2">No data yet</td></tr>'}</table>
-    <h2>Most visited pages</h2><table><tr><th>Seite</th><th>Aufrufe</th></tr>{page_rows or '<tr><td colspan="2">Noch keine Daten</td></tr>'}</table>
-    <p>Only aggregated page views are stored. No IP addresses or visitor profiles are collected.</p></main></html>"""
+    <h2>Most visited pages</h2><table><tr><th>Page</th><th>Views</th></tr>{page_rows or '<tr><td colspan="2">No data yet</td></tr>'}</table>
+    <h2>Recent signed-in visitors</h2><table><tr><th>Discord name</th><th>Date &amp; time</th><th>Page</th></tr>{visitor_rows or '<tr><td colspan="3">No signed-in visits recorded yet</td></tr>'}</table>
+    <p>Named visit records are created only for users signed in with Discord. Visitors who are not signed in are not identified. Times are UTC.</p></main></html>"""
     response = app.make_response(document)
     response.headers["Cache-Control"] = "no-store"
     response.headers["X-Robots-Tag"] = "noindex, nofollow"
