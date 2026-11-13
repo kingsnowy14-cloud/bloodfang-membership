@@ -57,7 +57,7 @@ ADMIN_DISCORD_IDS = {
 
 def get_site_content():
     defaults = {
-        "hero_title": "SUPPORT THE PACK.\\nGET YOUR REWARDS.",
+        "hero_title": "SUPPORT THE PACK.\nGET YOUR REWARDS.",
         "hero_description": "Browse Bloodfang memberships, Bloodpoints packages and one-time donations — all in one place.",
     }
     with db_connect() as db:
