@@ -1,0 +1,18 @@
+{
+  "content": {},
+  "tierPrices": {},
+  "layout": {
+    "__visual_overlay__:ccd36bd3-a337-4420-b7e5-9f000c0496ee": {
+      "x": -63.0,
+      "y": -45.0
+    },
+    "__visual_overlay__:fb6025c7-a466-45ee-ac64-29dea16cf8c9": {
+      "x": 1091.0,
+      "y": -14.0
+    }
+  },
+  "images": {
+    "__visual_overlay__:ccd36bd3-a337-4420-b7e5-9f000c0496ee": "/uploads/bfcb5d1219cd9b61e1a301ce6daf5548.png",
+    "__visual_overlay__:fb6025c7-a466-45ee-ac64-29dea16cf8c9": "/uploads/26167117b0394fcd7b8e209cc339d221.png"
+  }
+}
