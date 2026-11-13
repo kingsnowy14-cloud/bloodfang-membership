@@ -204,8 +204,13 @@ def visual_editor_api():
         for name, value in style.items():
             if name not in allowed_style_keys or not isinstance(value, str) or len(value) > 180:
                 return jsonify({"error": "invalid style property"}), 400
-            if name in {"color", "background", "position", "left", "top", "margin", "zIndex", "display", "objectFit"} and not all(c.isalnum() or c in "#(),.% -/" for c in value):
-                return jsonify({"error": "invalid color"}), 400
+            if name == "background":
+                is_hex = bool(__import__("re").fullmatch(r"#[0-9a-fA-F]{3,8}", value))
+                is_gradient = bool(__import__("re").fullmatch(r"linear-gradient\(\s*\d{1,3}deg,\s*#[0-9a-fA-F]{3,8},\s*#[0-9a-fA-F]{3,8}\s*\)", value))
+                if not (is_hex or is_gradient):
+                    return jsonify({"error": "invalid background value"}), 400
+            elif name in {"color", "position", "left", "top", "margin", "zIndex", "display", "objectFit"} and not all(c.isalnum() or c in "#(),.% -/" for c in value):
+                return jsonify({"error": "invalid style value"}), 400
             clean_style[name] = value
         clean_styles[key] = clean_style
     layout = payload.get("layout", {})
