@@ -37,8 +37,9 @@
     });
     return doc.body.innerHTML;
   };
-  fetch('/static/visual-edits.json?v=20261113-persisted-render', { cache: 'no-store' })
-    .then(response => response.ok ? response.json() : null)
+  fetch('/api/visual-edits-public', { cache: 'no-store' })
+    .then(response => { if (!response.ok) throw new Error('Live editor data unavailable'); return response.json(); })
+    .catch(() => fetch('/static/visual-edits.json?v=20261113-live-public-api', { cache: 'no-store' }).then(response => response.ok ? response.json() : null))
     .then(data => {
       if (!data || typeof data !== 'object') return;
       const changes = data.content || {};
