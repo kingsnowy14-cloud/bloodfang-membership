@@ -6,6 +6,7 @@
   <meta name="theme-color" content="#0c0b0d">
   <title>{{ title }} | BLOODFANG</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+{% if visual_editor_admin %}<meta name="visual-editor-csrf" content="{{ visual_editor_csrf }}">{% endif %}
 </head>
 <body>
   <main class="message checkout-panel">
@@ -59,5 +60,6 @@
       <a class="secondary-action" href="/points-shop">Points Shop</a>
     </div>
   </main>
+{% if visual_editor_admin %}<script src="{{ url_for('static', filename='visual-editor.js') }}" defer></script>{% endif %}
 </body>
 </html>
