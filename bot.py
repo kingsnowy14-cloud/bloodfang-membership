@@ -113,10 +113,10 @@ STATUS_ACTIVITIES = [
 _status_index = 0
 
 MEMBERSHIPS = [
-    ("STALKER", "€4.99", "25,000 Bloodpoints/day", "3 storage"),
-    ("WARLORD", "€12.99", "100,000 Bloodpoints/day", "5 storage"),
-    ("APEX", "€19.99", "200,000 Bloodpoints/day", "6 storage"),
-    ("BLOOD EMPEROR", "€29.99", "350,000 Bloodpoints/day", "8 storage"),
+    ("STALKER", "€5.00", "25,000 Bloodpoints/day", "3 storage"),
+    ("WARLORD", "€15.00", "100,000 Bloodpoints/day", "5 storage"),
+    ("APEX", "€20.00", "200,000 Bloodpoints/day", "6 storage"),
+    ("BLOOD EMPEROR", "€30.00", "350,000 Bloodpoints/day", "8 storage"),
     ("BLOOD TITAN", "€50.00", "1,000,000 Bloodpoints/day", "12 storage"),
     ("BLOOD GOD", "€120.00", "2,000,000 Bloodpoints/day", "20 storage"),
 ]
