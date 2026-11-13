@@ -6,7 +6,8 @@
   "tierPrices": {},
   "layout": {},
   "images": {
-    "__visual_global_overlay__:9d44cd9c-2dee-49a5-b134-69af417f1c76": "/uploads/bfcb5d1219cd9b61e1a301ce6daf5548.png"
+    "__visual_global_overlay__:9d44cd9c-2dee-49a5-b134-69af417f1c76": "/uploads/bfcb5d1219cd9b61e1a301ce6daf5548.png",
+    "__visual_global_overlay__:6b73b70a-8f41-4f3c-81a9-d63794231742": "/uploads/7a579d1172f281d8b2d99cb16f959333.png"
   },
   "styles": {
     "/|main:0/section:0/div:2": {
@@ -21,6 +22,16 @@
       "top": "8px",
       "width": "66px",
       "zIndex": "20"
+    },
+    "__visual_global_overlay__:6b73b70a-8f41-4f3c-81a9-d63794231742": {
+      "position": "absolute",
+      "left": "993px",
+      "top": "63px",
+      "width": "828px",
+      "height": "auto",
+      "margin": "0",
+      "zIndex": "20",
+      "display": "block"
     }
   }
 }
