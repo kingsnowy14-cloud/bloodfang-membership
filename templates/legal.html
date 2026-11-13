@@ -1,5 +1,6 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{{ title }} | BLOODFANG</title><link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}"></head>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{{ title }} | BLOODFANG</title><link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">{% if visual_editor_admin %}<meta name="visual-editor-csrf" content="{{ visual_editor_csrf }}">{% endif %}
+</head>
 <body><header class="topbar"><a class="brand" href="/">BLOOD<span>FANG</span></a><nav><a class="navbtn" href="/">Back to home</a></nav></header>
 <main class="legal-page">
 <div class="eyebrow">BLOODFANG · MEMBERSHIP</div><h1>{{ title }}</h1>
@@ -37,4 +38,5 @@
 <h2>Refunds and support</h2><p>Contact: bloodfang.support@gmail.com. Explain the refund process and expected timing consistently with applicable law and the payment provider’s rules.</p>
 {% endif %}
 <p class="legal-back"><a class="primary" href="/">Back to BLOODFANG</a></p>
-</main><footer><a class="brand" href="/">BLOOD<span>FANG</span></a><nav class="legal-links"><a href="/imprint">Legal Notice</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="/withdrawal">Withdrawal & Cancellation</a></nav></footer></body></html>
+</main><footer><a class="brand" href="/">BLOOD<span>FANG</span></a><nav class="legal-links"><a href="/imprint">Legal Notice</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="/withdrawal">Withdrawal & Cancellation</a></nav></footer>{% if visual_editor_admin %}<script src="{{ url_for('static', filename='visual-editor.js') }}" defer></script>{% endif %}
+</body></html>
