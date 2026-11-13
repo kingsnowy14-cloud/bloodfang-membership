@@ -6,7 +6,7 @@ from urllib.parse import urlencode
 import urllib.request
 
 import aiohttp
-from flask import Flask, redirect, render_template, request, session, url_for
+from flask import Flask, redirect, render_template, request, session, url_for, jsonify
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SESSION_SECRET") or secrets.token_hex(32)
@@ -45,7 +45,12 @@ POINT_PACKAGES = [
 @app.get("/")
 def index():
     site_content = get_site_content()
-    return render_template("index.html", tiers=TIERS, points=POINT_PACKAGES, user=session.get("discord_user"),
+    user = session.get("discord_user")
+    is_admin = bool(user and str(user.get("id", "")) in ADMIN_DISCORD_IDS)
+    if is_admin:
+        session["visual_editor_csrf"] = secrets.token_urlsafe(32)
+    return render_template("index.html", tiers=TIERS, points=POINT_PACKAGES, user=user,
+                           is_admin=is_admin, editor_csrf=session.get("visual_editor_csrf", ""),
                            stripe_configured=STRIPE_CHECKOUT_CONFIGURED, **site_content)
 
 
@@ -64,6 +69,48 @@ def get_site_content():
         rows = db.execute("SELECT key, value FROM app_settings WHERE key IN ('hero_title','hero_description')").fetchall()
     defaults.update({row["key"]: row["value"] for row in rows})
     return defaults
+
+
+
+def is_visual_editor_admin():
+    user = session.get("discord_user") or {}
+    return str(user.get("id", "")) in ADMIN_DISCORD_IDS
+
+
+@app.route("/api/visual-editor", methods=["GET", "POST"])
+def visual_editor_api():
+    if not is_visual_editor_admin():
+        return jsonify({"error": "forbidden"}), 403
+    if request.method == "GET":
+        with db_connect() as db:
+            row = db.execute("SELECT value FROM app_settings WHERE key='visual_editor_content'").fetchone()
+        try:
+            changes = json.loads(row["value"]) if row else {}
+        except (TypeError, ValueError):
+            changes = {}
+        session["visual_editor_csrf"] = session.get("visual_editor_csrf") or secrets.token_urlsafe(32)
+        return jsonify({"changes": changes, "csrf": session["visual_editor_csrf"]})
+
+    payload = request.get_json(silent=True) or {}
+    submitted = str(payload.get("csrf", ""))
+    expected = str(session.get("visual_editor_csrf", ""))
+    if not submitted or not expected or not secrets.compare_digest(submitted, expected):
+        return jsonify({"error": "invalid csrf token"}), 400
+    changes = payload.get("changes")
+    if not isinstance(changes, dict) or len(changes) > 500:
+        return jsonify({"error": "invalid changes"}), 400
+    clean = {}
+    for key, value in changes.items():
+        if not isinstance(key, str) or len(key) > 500 or not isinstance(value, str) or len(value) > 2000:
+            return jsonify({"error": "invalid editor content"}), 400
+        clean[key] = value
+    with db_connect() as db:
+        db.execute(
+            "INSERT INTO app_settings(key,value) VALUES('visual_editor_content',?) "
+            "ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+            (json.dumps(clean, ensure_ascii=False),),
+        )
+    return jsonify({"ok": True, "saved": len(clean)})
 
 
 @app.route("/admin", methods=["GET", "POST"])
@@ -110,7 +157,7 @@ def login():
                                message="Discord OAuth2 variables must be configured in Railway first."), 503
     next_path = request.args.get("next", "")
     # Only allow internal checkout paths so login cannot redirect to an external site.
-    if next_path.startswith("/checkout/") and not next_path.startswith("//") and "\\r" not in next_path and "\\n" not in next_path:
+    if (next_path == "/admin" or next_path.startswith("/checkout/")) and not next_path.startswith("//") and "\\r" not in next_path and "\\n" not in next_path:
         session["post_login_next"] = next_path
     else:
         session.pop("post_login_next", None)
@@ -144,7 +191,7 @@ def callback():
                                message="Could not reach Discord. Please try again later."), 502
     session["discord_user"] = user
     next_path = session.pop("post_login_next", None)
-    return redirect(next_path if next_path and next_path.startswith("/checkout/") and not next_path.startswith("//") else url_for("index"))
+    return redirect(next_path if next_path and (next_path == "/admin" or next_path.startswith("/checkout/")) and not next_path.startswith("//") else url_for("index"))
 
 async def fetch_discord_user(code):
     async with aiohttp.ClientSession() as client:
