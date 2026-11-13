@@ -196,3 +196,8 @@ body.visual-editing [contenteditable=true]{outline:2px solid #ed5363;outline-off
 .ve-footer{padding-top:14px}
 body.visual-editing main,body.visual-editing section,body.visual-editing header,body.visual-editing footer,body.visual-editing .hero,body.visual-editing .section{outline:1px dashed #d94a61;outline-offset:-3px}
 @media(max-width:560px){.visual-edit-launch{left:10px!important;top:10px!important;padding:10px 13px!important}.visual-edit-launch.is-active{left:min(340px,89vw)!important;top:10px!important}}
+
+/* Clear, visible mouse indicator while the visual editor is active */
+.ve-cursor-mark{position:fixed;left:-100px;top:-100px;z-index:100050;width:22px;height:22px;border:2px solid #fff;border-radius:50%;box-shadow:0 0 0 2px #d72b3f,0 2px 12px #000c;pointer-events:none;transform:translate(-50%,-50%);opacity:0;transition:opacity .12s ease;background:#d72b3f22}
+.ve-cursor-mark:after{content:"";position:absolute;width:4px;height:4px;left:50%;top:50%;transform:translate(-50%,-50%);border-radius:50%;background:#fff}
+body.visual-editing .ve-cursor-mark{opacity:1}
