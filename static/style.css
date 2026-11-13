@@ -283,3 +283,7 @@ body.visual-editing img.visual-editor-logo {
   outline: none !important;
   outline-offset: 0 !important;
 }
+
+/* Keep the admin editor launcher in the same top-left position on every page. */
+.topbar>.brand{flex:0 0 auto}.topbar>.visual-edit-launch{flex:0 0 auto;margin-left:14px;margin-right:auto;white-space:nowrap;display:inline-flex;align-items:center;justify-content:center;min-height:38px;padding:9px 13px;background:#211419;border-color:#70404a;color:#fff}.topbar>.main-nav{margin-left:auto}.message>.brand+.visual-edit-launch{display:inline-flex;vertical-align:middle;margin:0 0 0 14px;min-height:38px;padding:9px 13px;background:#211419;border:1px solid #70404a;border-radius:4px;color:#fff;font-size:12px;font-weight:700;white-space:nowrap}
+@media(max-width:560px){.topbar{justify-content:flex-start;gap:0}.topbar>.visual-edit-launch{margin-left:10px;padding:8px 9px;font-size:10px}.topbar>.main-nav{margin-left:auto;gap:6px}.message>.brand+.visual-edit-launch{margin-left:8px;padding:8px 9px;font-size:10px}}
