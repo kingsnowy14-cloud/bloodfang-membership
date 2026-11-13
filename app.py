@@ -289,7 +289,7 @@ def visual_editor_upload():
         return jsonify({"error": "invalid csrf token"}), 400
     uploaded = request.files.get("image")
     if not uploaded or not uploaded.filename:
-        return jsonify({"error": "Bitte ein Bild auswählen."}), 400
+        return jsonify({"error": "Please choose an image."}), 400
     allowed = {"png", "jpg", "jpeg", "webp", "gif"}
     original = secure_filename(uploaded.filename)
     extension = original.rsplit(".", 1)[-1].lower() if "." in original else ""
@@ -306,7 +306,7 @@ def visual_editor_upload():
         "webp": len(data) >= 12 and data[:4] == b"RIFF" and data[8:12] == b"WEBP",
     }
     if not signatures.get(extension):
-        return jsonify({"error": "Die Datei ist kein gültiges Bild."}), 400
+        return jsonify({"error": "The file is not a valid image."}), 400
     filename = secrets.token_hex(16) + "." + extension
     persistent_dir = "/data/uploads"
     fallback_dir = os.path.join(app.root_path, "static", "uploads")
@@ -323,7 +323,7 @@ def visual_editor_upload():
         except OSError:
             app.logger.exception("Image upload storage unavailable: %s", upload_dir)
     if not saved:
-        return jsonify({"error": "Der Server kann das Bild derzeit nicht speichern. Bitte Administrator informieren."}), 500
+        return jsonify({"error": "The server cannot save the image right now. Please contact the administrator."}), 500
     return jsonify({"ok": True, "url": "/uploads/" + filename})
 
 
@@ -852,7 +852,7 @@ def _donation_leaderboard_payload():
         ("⚫ Obsidian", "€425–574", "+10 Slots"),
         ("🟣 Amethyst", "€575–724", "+12 Slots"),
         ("🌑 Dark Matter", "€725–899", "+14 Slots"),
-        ("👑 Blood God", "€900+", "+16 Slots + Ticket-Priorität"),
+        ("👑 Blood God", "€900+", "+16 slots + ticket priority"),
     ]
     ranks_text = "\\n".join(f"{name} — **{price}** → {bonus}" for name, price, bonus in rank_rows)
     with db_connect() as db:
@@ -869,21 +869,21 @@ def _donation_leaderboard_payload():
             donor_lines.append(f"{medals[index]} **{name}** — €{int(donor['total_cents']) / 100:,.2f}")
         top_text = "\\n".join(donor_lines)
     else:
-        top_text = "Noch keine bestätigten Spenden. Sei der erste BLOODFANG Donator!"
+        top_text = "No confirmed donations yet. Be the first BLOODFANG donor!"
     return {
         "embeds": [
             {
                 "title": "🩸 BLOODFANG Donation Ranks",
-                "description": "Dein bestätigter Lifetime-Spendenbetrag bestimmt deinen Rang. Storage-Boni sind Gesamtboni.",
+                "description": "Your confirmed lifetime donation total determines your rank. Storage bonuses are cumulative.",
                 "color": 10027008,
-                "fields": [{"name": "Rang • Spendenbetrag • Belohnung", "value": ranks_text, "inline": False}],
+                "fields": [{"name": "Rank • Donation amount • Reward", "value": ranks_text, "inline": False}],
                 "footer": {"text": "Automatische Aktualisierung alle 10 Minuten"},
             },
             {
                 "title": "🏆 Top 5 Donators",
                 "description": top_text,
                 "color": 16766720,
-                "footer": {"text": "Sortiert nach bestätigten Lifetime-Spenden • Anonyme Spenden werden nicht namentlich angezeigt"},
+                "footer": {"text": "Sorted by confirmed lifetime donations • Anonymous donations are not shown by name"},
             },
         ],
         "allowed_mentions": {"parse": []},
