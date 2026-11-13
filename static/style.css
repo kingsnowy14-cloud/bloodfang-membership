@@ -269,3 +269,7 @@ body.visual-editing img.visual-editor-logo{
 body.visual-editing .topbar .visual-editor-logo-slot{display:inline-flex!important;align-items:center;vertical-align:middle;}
 body.visual-editing .topbar .brand img.visual-editor-logo{display:inline-block!important;width:34px!important;height:34px!important;max-width:34px!important;object-fit:contain!important;margin:0 9px 0 0!important;vertical-align:middle!important;}
 body.visual-editing .hero-mark img.visual-editor-logo{display:inline-block!important;max-width:120px!important;max-height:120px!important;object-fit:contain!important;}
+
+/* Editor-only drag handle for reliable mouse resizing across browsers. */
+.ve-image-resize-handle{display:none;position:fixed;z-index:100020;width:18px;height:18px;padding:0;border:2px solid #fff;border-radius:50%;background:#e43f5b;box-shadow:0 1px 8px #000b;cursor:nwse-resize!important;touch-action:none}
+body.visual-editing .ve-image-resize-handle{display:block}
