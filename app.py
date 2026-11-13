@@ -416,7 +416,7 @@ def track_website_page_view():
     if request.method != "GET":
         return
     path = request.path or "/"
-    if path.startswith(("/static/", "/api/", "/uploads/", "/auth/")) or path in {"/favicon.ico", "/robots.txt"}:
+    if path.startswith(("/static/", "/api/", "/uploads/", "/auth/", "/admin/")) or path in {"/favicon.ico", "/robots.txt"}:
         return
     try:
         with db_connect() as db:
