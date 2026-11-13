@@ -137,10 +137,16 @@ def visual_editor_api():
             (json.dumps(clean, ensure_ascii=False),),
         )
         if clean_prices:
+            existing_row = db.execute("SELECT value FROM app_settings WHERE key='tier_prices'").fetchone()
+            try:
+                merged_prices = json.loads(existing_row["value"]) if existing_row else {}
+            except (TypeError, ValueError):
+                merged_prices = {}
+            merged_prices.update(clean_prices)
             db.execute(
                 "INSERT INTO app_settings(key,value) VALUES('tier_prices',?) "
                 "ON CONFLICT(key) DO UPDATE SET value=excluded.value",
-                (json.dumps(clean_prices, ensure_ascii=False),),
+                (json.dumps(merged_prices, ensure_ascii=False),),
             )
     return jsonify({"ok": True, "saved": len(clean), "prices": len(clean_prices)})
 
