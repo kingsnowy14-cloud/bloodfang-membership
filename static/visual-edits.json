@@ -6,8 +6,8 @@
   "tierPrices": {},
   "layout": {
     "__visual_global_overlay__:b86752ad-06ad-41d6-b118-b9a415c47928": {
-      "x": -73.0,
-      "y": -15.0
+      "x": -135.0,
+      "y": -14.0
     }
   },
   "images": {
@@ -33,12 +33,12 @@
     },
     "__visual_global_overlay__:b86752ad-06ad-41d6-b118-b9a415c47928": {
       "display": "block",
-      "height": "564px",
+      "height": "631px",
       "left": "992px",
       "margin": "0",
       "position": "absolute",
       "top": "67px",
-      "width": "846px",
+      "width": "947px",
       "zIndex": "20"
     },
     "__visual_page_hidden__:/donate|__visual_global_overlay__:b86752ad-06ad-41d6-b118-b9a415c47928": {
