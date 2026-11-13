@@ -3,7 +3,6 @@
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#0c0b0d">
-  {% if is_admin %}<meta name="visual-editor-csrf" content="{{ visual_editor_csrf }}">{% endif %}
   <meta name="description" content="BLOODFANG Store — memberships, Bloodpoints and donations for The Isle: Evrima.">
   <title>BLOODFANG STORE | The Isle: Evrima</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
@@ -12,11 +11,11 @@
 <body class="store-page">
 <header class="topbar">
   <a class="brand" href="/">BLOOD<span>FANG</span><small>STORE</small></a>
+  {% if visual_editor_admin %}<button class="navbtn visual-edit-launch" id="visualEditLaunch" type="button">✎ Website bearbeiten</button>{% endif %}
   <nav class="main-nav" aria-label="Store navigation">
     <a class="navbtn" href="#memberships">Memberships</a>
     <a class="navbtn" href="/points-shop">Bloodpoints</a>
     <a class="navbtn" href="/donate">Donations</a>
-    {% if is_admin %}<button class="navbtn visual-edit-launch" id="visualEditLaunch" type="button">✎ Website bearbeiten</button>{% endif %}
     {% if user %}
       <a class="navbtn" href="/my-memberships">My purchases</a>
       <span class="user">{{ user.global_name }}</span>
