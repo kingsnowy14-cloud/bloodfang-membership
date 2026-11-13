@@ -10,7 +10,7 @@
 </head>
 <body>
   <main class="message checkout-panel">
-    <a class="brand" href="/">BLOOD<span>FANG</span></a>
+    <a class="brand" href="/">BLOOD<span>FANG</span></a>{% if visual_editor_admin %}<button class="visual-edit-launch" id="visualEditLaunch" type="button">✎ Edit website</button>{% endif %}
 
     {% if tier is defined %}
       <div class="eyebrow checkout-eyebrow">SECURE MEMBERSHIP CHECKOUT</div>
@@ -61,5 +61,8 @@
     </div>
   </main>
 {% if visual_editor_admin %}<script src="{{ url_for('static', filename='visual-editor.js') }}" defer></script>{% endif %}
+
+<script src="{{ url_for('static', filename='visual-edits.js', v='20261113-editor-position2') }}" defer></script>
+{% if visual_editor_admin %}<script src="{{ url_for('static', filename='visual-editor.js', v='20261113-editor-position2') }}" defer></script>{% endif %}
 </body>
 </html>
