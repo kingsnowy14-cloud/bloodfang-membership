@@ -37,6 +37,19 @@
     });
     return doc.body.innerHTML;
   };
+  function globalBackgroundCss(value){
+    if(!value)return '';
+    let gradient=value;
+    if(/^#[0-9a-f]{6}$/i.test(value)){
+      const rgb=value.match(/[0-9a-f]{2}/ig).map(v=>parseInt(v,16));
+      const blend=(target,amount)=>rgb.map((v,i)=>Math.round(v*(1-amount)+target[i]*amount));
+      const mid=blend([20,12,15],.58).map(v=>v.toString(16).padStart(2,'0')).join('');
+      gradient='linear-gradient(125deg, '+value+' 0%, #'+mid+' 52%, #0c0b0d 100%)';
+    }
+    return 'html,body{background:'+gradient+'!important;background-attachment:fixed!important;}'+
+      'body{transition:background 700ms ease!important;}'+
+      'body>main,body>header,body>footer,main>section,main>header,main>footer,.hero,.section,.cta,.store-bottom{background-color:transparent!important;background-image:none!important;transition:background 700ms ease!important;}';
+  }
   fetch('/api/visual-edits-public', { cache: 'no-store' })
     .then(response => { if (!response.ok) throw new Error('Live editor data unavailable'); return response.json(); })
     .catch(() => fetch('/static/visual-edits.json?v=20261113-live-public-api', { cache: 'no-store' }).then(response => response.ok ? response.json() : null))
@@ -47,7 +60,7 @@
       const layout = data.layout || {};
       const images = data.images || {};
       const styles = data.styles || {};
-      if (styles['__visual_global__']) { const g=styles['__visual_global__']; Object.assign(document.body.style,g); let tag=document.getElementById('ve-global-style'); if(!tag){tag=document.createElement('style');tag.id='ve-global-style';document.head.appendChild(tag);} tag.textContent=(g.color?'body *{color:'+g.color+'!important;}':'')+(g.background?'html,body{background:'+g.background+'!important;}':''); }
+      if (styles['__visual_global__']) { const g=styles['__visual_global__']; if(g.color)document.body.style.color=g.color; let tag=document.getElementById('ve-global-style'); if(!tag){tag=document.createElement('style');tag.id='ve-global-style';document.head.appendChild(tag);} tag.textContent=(g.color?'body *{color:'+g.color+'!important;}':'')+globalBackgroundCss(g.background); }
       if (styles[key(document.body)]) Object.assign(document.body.style, styles[key(document.body)]);
       document.querySelectorAll('body *').forEach(el => {
         const id = key(el);
