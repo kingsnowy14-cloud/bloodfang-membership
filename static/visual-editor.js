@@ -23,7 +23,7 @@
     return parts.join('/');
   }
   function eligible(el) {
-    if (!el || !el.isConnected || el.closest('.visual-editor-bar, header, script, style, select, option, button, input, textarea, svg')) return false;
+    if (!el || !el.isConnected || el.closest('.visual-editor-bar, script, style, select, option, button, input, textarea, svg')) return false;
     return ['A','H1','H2','H3','P','SMALL','STRONG','SPAN','LABEL','DIV','FOOTER'].includes(el.tagName) &&
       el.children.length === 0 && Array.from(el.childNodes).some(n => n.nodeType === Node.TEXT_NODE && n.textContent.trim());
   }
