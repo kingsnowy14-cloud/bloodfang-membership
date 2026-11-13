@@ -255,6 +255,7 @@ body.visual-editing img.visual-editor-logo{
   height:auto;
   overflow:auto;
   resize:both;
+  overflow:auto!important;
   object-fit:contain;
   vertical-align:middle;
   cursor:move!important;
