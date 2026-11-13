@@ -1,47 +1,55 @@
 (() => {
-  const meta=document.querySelector('meta[name="visual-editor-csrf"]'); if(!meta)return;
-  let changes={},tierPrices={},layout={},images={},csrf=meta.content,active=false,dirty=false,current=null,drag=null,suppressClick=false,selectedImage=null;
+  const meta=document.querySelector('meta[name="visual-editor-csrf"]');if(!meta)return;
+  let changes={},tierPrices={},layout={},images={},styles={},csrf=meta.content,active=false,dirty=false,current=null,drag=null,selectedImage=null;
   const page=location.pathname.replace(/\/$/,'')||'/';
-  const launch=document.createElement('button');launch.type='button';launch.className='visual-edit-launch';launch.textContent='✎ Edit website';document.body.appendChild(launch);
-  const bar=document.createElement('div');bar.className='visual-editor-bar';
-  bar.innerHTML='<span class="visual-editor-help">Editor · click text or image · drag links</span><span class="visual-editor-status">Ready</span><button type="button" class="secondary" data-action="upload">Upload image</button><button type="button" class="secondary" data-action="cancel">Cancel</button><button type="button" data-action="save">Save</button>';
-  document.body.appendChild(bar);
-  const status=bar.querySelector('.visual-editor-status'),saveButton=bar.querySelector('[data-action="save"]');
+  const key=el=>{const p=[];let n=el;while(n&&n!==document.body){const par=n.parentElement;if(!par)break;const same=[...par.children].filter(x=>x.tagName===n.tagName);p.unshift(n.tagName.toLowerCase()+':'+same.indexOf(n));n=par;}return page+'|'+p.join('/');};
+  const styleKey=k=>'__visual_style__:'+k;
+  const safeHTML=value=>{const doc=new DOMParser().parseFromString(String(value),'text/html');const allowed=new Set(['B','STRONG','I','EM','U','S','SPAN','BR','FONT']);doc.body.querySelectorAll('*').forEach(el=>{if(!allowed.has(el.tagName)){el.replaceWith(...el.childNodes);return;}[...el.attributes].forEach(a=>{if(a.name==='style'){const safe=[];for(const part of a.value.split(';')){const ix=part.indexOf(':');if(ix<0)continue;const prop=part.slice(0,ix).trim().toLowerCase(),val=part.slice(ix+1).trim();if(['color','font-size','font-family','font-weight','font-style','text-decoration'].includes(prop)&&!/url\s*\(|expression|javascript/i.test(val))safe.push(prop+':'+val);}el.setAttribute('style',safe.join(';'));}else if(a.name!=='color'&&a.name!=='face'&&a.name!=='size')el.removeAttribute(a.name);});});return doc.body.innerHTML;};
+  const launch=document.createElement('button');launch.type='button';launch.className='visual-edit-launch';launch.textContent='✎ EDIT';launch.setAttribute('aria-label','Open website editor');document.body.appendChild(launch);
+  const panel=document.createElement('aside');panel.className='visual-editor-panel';panel.innerHTML=
+    '<div class="ve-head"><b>✦ SITE EDITOR</b><button type="button" data-act="close" aria-label="Close">×</button></div>'+
+    '<div class="ve-status">Click an element on the page to edit it.</div>'+
+    '<section class="ve-group"><b>TEXT FORMAT</b><div class="ve-tools">'+
+    '<button type="button" data-cmd="bold"><b>B</b></button><button type="button" data-cmd="italic"><i>I</i></button><button type="button" data-cmd="underline"><u>U</u></button><button type="button" data-cmd="strikeThrough"><s>S</s></button>'+
+    '<select data-font><option value="">Font family</option><option>Arial</option><option>Inter</option><option>Georgia</option><option>Verdana</option><option>Tahoma</option><option>Times New Roman</option><option>Courier New</option><option>Barlow Condensed</option></select>'+
+    '<select data-size><option value="">Size</option><option value="1">10 px</option><option value="2">13 px</option><option value="3">16 px</option><option value="4">18 px</option><option value="5">24 px</option><option value="6">32 px</option><option value="7">48 px</option></select></div>'+
+    '<label>Text colour <input type="color" data-color value="#ffffff"></label><label>Element background <input type="color" data-bg value="#151316"></label>'+
+    '<label>Alignment <select data-align><option value="">Keep</option><option value="left">Left</option><option value="center">Center</option><option value="right">Right</option></select></label></section>'+
+    '<section class="ve-group"><b>BACKGROUND GRADIENT</b><label>Colour 1 <input type="color" data-grad1 value="#251018"></label><label>Colour 2 <input type="color" data-grad2 value="#0c0b0d"></label><label>Angle <input type="range" min="0" max="360" value="135" data-angle></label><button type="button" data-act="gradient">Apply gradient</button><button type="button" data-act="clearbg" class="ve-muted">Clear background</button></section>'+
+    '<section class="ve-group"><b>IMAGES</b><button type="button" data-act="upload" class="ve-primary">＋ Upload image</button><small>Click an existing image to replace it, or upload a new one into the page.</small></section>'+
+    '<section class="ve-group ve-footer"><button type="button" data-act="cancel" class="ve-muted">Discard</button><button type="button" data-act="save" class="ve-primary">Save changes</button></section>';
+  document.body.appendChild(panel);
+  const status=panel.querySelector('.ve-status'),saveBtn=panel.querySelector('[data-act="save"]');
   const picker=document.createElement('input');picker.type='file';picker.accept='image/png,image/jpeg,image/webp,image/gif';picker.hidden=true;document.body.appendChild(picker);
-  function key(el){const p=[];let n=el;while(n&&n!==document.body){const parent=n.parentElement;if(!parent)break;const sib=Array.from(parent.children).filter(x=>x.tagName===n.tagName);p.unshift(n.tagName.toLowerCase()+':'+sib.indexOf(n));n=parent;}return page+'|'+p.join('/');}
-  function editable(el){if(!el||!el.isConnected||el.closest('.visual-editor-bar,.visual-edit-launch,script,style,select,option,input,textarea,svg'))return false;
-    if(['A','BUTTON'].includes(el.tagName))return el.textContent.trim().length>0;
-    return ['H1','H2','H3','P','SMALL','STRONG','SPAN','LABEL','DIV','FOOTER','LI','TD','TH'].includes(el.tagName)&&el.children.length===0&&Array.from(el.childNodes).some(n=>n.nodeType===Node.TEXT_NODE&&n.textContent.trim());}
-  function apply(){document.querySelectorAll('body *').forEach(el=>{const k=key(el);if(editable(el)&&Object.prototype.hasOwnProperty.call(changes,k))el.textContent=changes[k];
-    if(el.dataset.tierPrice&&tierPrices[el.dataset.tierPrice])el.textContent='€'+tierPrices[el.dataset.tierPrice];
-    if(el.tagName==='IMG'&&images[k])el.src=images[k];
-    if(layout[k]){el.style.transform='translate('+layout[k].x+'px,'+layout[k].y+'px)';el.dataset.visualMovable='1';}});}
-  async function load(){const r=await fetch('/api/visual-editor');if(!r.ok)throw new Error('Could not load editor');const d=await r.json();changes=d.changes||{};tierPrices=d.tierPrices||{};layout=d.layout||{};images=d.images||{};csrf=d.csrf||csrf;apply();}
-  function markDirty(){dirty=true;status.textContent='Unsaved changes';}
-  function finish(){if(!current)return;const k=current.dataset.visualKey,v=current.innerText;if(k&&changes[k]!==v){changes[k]=v;markDirty();}if(current.dataset.tierPrice){const m=v.match(/([0-9]{1,4},[0-9]{2})/);if(m){tierPrices[current.dataset.tierPrice]=m[1];markDirty();}}current.removeAttribute('contenteditable');current=null;}
-  function start(el){if(!editable(el)||current===el)return;finish();const k=key(el);el.dataset.visualKey=k;el.dataset.visualEditable='1';current=el;el.setAttribute('contenteditable','true');el.focus();const range=document.createRange();range.selectNodeContents(el);range.collapse(false);const sel=getSelection();sel.removeAllRanges();sel.addRange(range);status.textContent='Editing text';}
-  async function upload(file,target){if(!file)return;const form=new FormData();form.append('image',file);form.append('csrf',csrf);status.textContent='Uploading…';
-    try{const r=await fetch('/api/visual-editor/upload',{method:'POST',body:form});const d=await r.json();if(!r.ok)throw new Error(d.error||'Upload failed');
-      let img=target;if(!img){img=document.createElement('img');img.alt='Uploaded image';img.className='visual-editor-added-image';const host=document.querySelector('main')||document.querySelector('.section')||document.body;host.appendChild(img);}
-      const k=key(img);img.src=d.url;images[k]=d.url;selectedImage=img;markDirty();status.textContent='Image uploaded · Save to publish';
-    }catch(e){status.textContent=e.message||'Upload failed';}}
-  function save(){finish();if(!dirty){status.textContent='All changes saved';return;}saveButton.disabled=true;status.textContent='Saving…';
-    fetch('/api/visual-editor',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({csrf,changes,tierPrices,layout,images})})
-      .then(async r=>{const d=await r.json();if(!r.ok)throw new Error(d.error||'Save failed');dirty=false;status.textContent=d.githubSynced?'Saved · committed to main ✓':'Saved · GitHub sync not configured';})
-      .catch(e=>status.textContent=e.message||'Save failed').finally(()=>saveButton.disabled=false);}
-  function mode(on){active=on;document.body.classList.toggle('visual-editing',on);bar.classList.toggle('is-visible',on);launch.textContent=on?'✕ Close editor':'✎ Edit website';if(!on)finish();}
-  launch.addEventListener('click',async()=>{if(active){if(dirty&&!confirm('Discard unsaved changes?'))return;mode(false);return;}try{await load();mode(true);status.textContent='Click text/image · drag links · links disabled';}catch(e){alert(e.message);}});
-  document.addEventListener('click',e=>{if(!active||e.target.closest('.visual-editor-bar,.visual-edit-launch'))return;
-    e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();
-    if(suppressClick){suppressClick=false;return;}
-    const img=e.target.closest('img');if(img){selectedImage=img;picker.onchange=()=>{upload(picker.files[0],img);picker.value='';};picker.click();return;}
-    let el=e.target;while(el&&el!==document.body&&!editable(el))el=el.parentElement;if(el&&el!==document.body)start(el);
-  },true);
-  document.addEventListener('pointerdown',e=>{if(!active||e.target.closest('.visual-editor-bar,.visual-edit-launch'))return;const el=e.target.closest('a,button,[role="button"]');if(!el)return;const k=key(el),old=layout[k]||{x:0,y:0};drag={el,k,sx:e.clientX,sy:e.clientY,x:old.x,y:old.y,moved:false};},true);
-  document.addEventListener('pointermove',e=>{if(!drag)return;const dx=e.clientX-drag.sx,dy=e.clientY-drag.sy;if(Math.abs(dx)+Math.abs(dy)<5)return;drag.moved=true;const pos={x:Math.round(drag.x+dx),y:Math.round(drag.y+dy)};drag.el.style.transform='translate('+pos.x+'px,'+pos.y+'px)';drag.el.dataset.visualMovable='1';layout[drag.k]=pos;markDirty();},true);
-  document.addEventListener('pointerup',()=>{if(drag){if(drag.moved){status.textContent='Link position changed';suppressClick=true;}drag=null;}},true);
-  bar.querySelector('[data-action="upload"]').addEventListener('click',()=>{picker.onchange=()=>{upload(picker.files[0],selectedImage);picker.value='';};picker.click();});
-  bar.querySelector('[data-action="cancel"]').addEventListener('click',()=>{if(dirty&&!confirm('Discard unsaved changes?'))return;location.reload();});
-  saveButton.addEventListener('click',save);
-  document.addEventListener('keydown',e=>{if(active&&e.key==='Escape'&&current){current.textContent=changes[current.dataset.visualKey]??current.textContent;current.removeAttribute('contenteditable');current=null;}if(active&&(e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='s'){e.preventDefault();save();}});
+  function mark(){dirty=true;status.textContent='Unsaved changes';}
+  function canEdit(el){if(!el||!el.isConnected||el.closest('.visual-editor-panel,.visual-edit-launch,script,style,input,textarea,select,option,svg'))return false;return ['A','BUTTON','H1','H2','H3','H4','P','SMALL','STRONG','SPAN','LABEL','LI','TD','TH','IMG'].includes(el.tagName);}
+  function choose(el){if(!canEdit(el))return;current=el;status.textContent='Selected: '+el.tagName.toLowerCase()+' · edit the controls below';}
+  function apply(){document.querySelectorAll('body *').forEach(el=>{const k=key(el);if(el.tagName==='IMG'&&images[k])el.src=images[k];if(el.dataset.tierPrice&&tierPrices[el.dataset.tierPrice])el.textContent='€'+tierPrices[el.dataset.tierPrice];if(layout[k])el.style.transform='translate('+layout[k].x+'px,'+layout[k].y+'px)';if(styles[k])Object.assign(el.style,styles[k]);if(canEdit(el)&&Object.prototype.hasOwnProperty.call(changes,k))el.innerHTML=safeHTML(changes[k]);});}
+  async function load(){const r=await fetch('/api/visual-editor',{credentials:'same-origin'});if(!r.ok)throw new Error('Editor data could not be loaded ('+r.status+')');const d=await r.json();changes=d.changes||{};tierPrices=d.tierPrices||{};layout=d.layout||{};images=d.images||{};styles=d.styles||{};csrf=d.csrf||csrf;apply();}
+  function persistCurrent(){if(!current)return;const k=key(current);if(current.tagName!=='IMG'){const html=safeHTML(current.innerHTML);if(changes[k]!==html){changes[k]=html;mark();}}current.removeAttribute('contenteditable');}
+  function ensureEditable(){if(!current||current.tagName==='IMG'){status.textContent='Select a text element first.';return false;}persistCurrent();current.setAttribute('contenteditable','true');current.focus();return true;}
+  function styleCurrent(name,value){if(!current){status.textContent='Select an element first.';return;}const k=key(current);styles[k]=styles[k]||{};styles[k][name]=value;current.style[name]=value;mark();}
+  async function upload(file,target){if(!file)return;const form=new FormData();form.append('image',file);form.append('csrf',csrf);status.textContent='Uploading image…';try{const r=await fetch('/api/visual-editor/upload',{method:'POST',body:form,credentials:'same-origin'});let d={};try{d=await r.json();}catch{}if(!r.ok)throw new Error(d.error||'Upload failed ('+r.status+')');let img=target;if(!img){img=document.createElement('img');img.alt='New image';img.className='visual-editor-added-image';const host=current&&current!==document.body?current:(document.querySelector('main')||document.body);host.appendChild(img);}const k=key(img);img.src=d.url;images[k]=d.url;current=img;mark();status.textContent='Image uploaded. Save changes to keep it.';}catch(e){status.textContent=e.message||'Image upload failed';}}
+  function save(){persistCurrent();saveBtn.disabled=true;status.textContent='Saving…';fetch('/api/visual-editor',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({csrf,changes,tierPrices,layout,images,styles})}).then(async r=>{const d=await r.json();if(!r.ok)throw new Error(d.error||'Save failed');dirty=false;status.textContent=d.githubSynced?'Saved · GitHub main synced':'Saved on website · GitHub sync unavailable';}).catch(e=>status.textContent=e.message||'Save failed').finally(()=>saveBtn.disabled=false);}
+  function open(){panel.classList.add('is-open');document.body.classList.add('visual-editing');launch.classList.add('is-active');}
+  function close(){if(dirty&&!confirm('Discard unsaved changes?'))return;location.reload();}
+  launch.addEventListener('click',async()=>{if(panel.classList.contains('is-open')){close();return;}try{await load();open();}catch(e){alert(e.message);}});
+  document.addEventListener('click',e=>{if(!panel.classList.contains('is-open')||e.target.closest('.visual-editor-panel,.visual-edit-launch'))return;e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();const img=e.target.closest('img');if(img){choose(img);picker.onchange=()=>{upload(picker.files[0],img);picker.value='';};picker.click();return;}let el=e.target;while(el&&el!==document.body&&!canEdit(el))el=el.parentElement;if(el&&el!==document.body)choose(el);},true);
+  document.addEventListener('pointerdown',e=>{if(!panel.classList.contains('is-open')||e.target.closest('.visual-editor-panel,.visual-edit-launch'))return;const el=e.target.closest('a,button,[role="button"]');if(!el)return;const k=key(el),old=layout[k]||{x:0,y:0};drag={el,k,sx:e.clientX,sy:e.clientY,x:old.x,y:old.y,moved:false};},true);
+  document.addEventListener('pointermove',e=>{if(!drag)return;const dx=e.clientX-drag.sx,dy=e.clientY-drag.sy;if(Math.abs(dx)+Math.abs(dy)<5)return;drag.moved=true;const pos={x:Math.round(drag.x+dx),y:Math.round(drag.y+dy)};drag.el.style.transform='translate('+pos.x+'px,'+pos.y+'px)';layout[drag.k]=pos;mark();},true);
+  document.addEventListener('pointerup',()=>{if(drag){if(drag.moved)status.textContent='Button position changed';drag=null;}},true);
+  panel.addEventListener('mousedown',e=>{if(e.target.closest('[data-cmd]'))e.preventDefault();});
+  panel.querySelectorAll('[data-cmd]').forEach(b=>b.addEventListener('click',()=>{if(!ensureEditable())return;document.execCommand(b.dataset.cmd,false,null);persistCurrent();}));
+  panel.querySelector('[data-font]').addEventListener('change',e=>{if(!e.target.value||!ensureEditable())return;document.execCommand('fontName',false,e.target.value);persistCurrent();});
+  panel.querySelector('[data-size]').addEventListener('change',e=>{if(!e.target.value||!ensureEditable())return;document.execCommand('fontSize',false,e.target.value);persistCurrent();});
+  panel.querySelector('[data-color]').addEventListener('input',e=>{if(!ensureEditable())return;document.execCommand('foreColor',false,e.target.value);persistCurrent();});
+  panel.querySelector('[data-bg]').addEventListener('input',e=>styleCurrent('backgroundColor',e.target.value));
+  panel.querySelector('[data-align]').addEventListener('change',e=>{if(e.target.value)styleCurrent('textAlign',e.target.value);});
+  panel.querySelector('[data-act="gradient"]').addEventListener('click',()=>{if(!current){status.textContent='Select an element first.';return;}const c1=panel.querySelector('[data-grad1]').value,c2=panel.querySelector('[data-grad2]').value,angle=panel.querySelector('[data-angle]').value;styleCurrent('background','linear-gradient('+angle+'deg, '+c1+', '+c2+')');});
+  panel.querySelector('[data-act="clearbg"]').addEventListener('click',()=>{if(!current)return;const k=key(current);styles[k]=styles[k]||{};delete styles[k].background;current.style.background='';mark();});
+  panel.querySelector('[data-act="upload"]').addEventListener('click',()=>{picker.onchange=()=>{upload(picker.files[0],null);picker.value='';};picker.click();});
+  panel.querySelector('[data-act="save"]').addEventListener('click',save);
+  panel.querySelector('[data-act="cancel"]').addEventListener('click',close);
+  panel.querySelector('[data-act="close"]').addEventListener('click',close);
+  document.addEventListener('keydown',e=>{if(panel.classList.contains('is-open')&&(e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='s'){e.preventDefault();save();}});
 })();
