@@ -387,6 +387,36 @@ def visual_editor_uploaded_image(filename):
     raise NotFound()
 
 
+@app.get("/admin/code")
+def admin_code_viewer():
+    # Read-only source viewer. Access is restricted to explicitly allowlisted Discord IDs.
+    if not is_visual_editor_admin():
+        return render_template("message.html", title="Access denied",
+                               message="Your Discord account is not authorized to view website source code."), 403
+
+    allowed_files = [
+        "app.py",
+        "templates/index.html", "templates/donate.html", "templates/points.html",
+        "templates/memberships.html", "templates/legal.html", "templates/message.html",
+        "static/style.css", "static/visual-editor.js", "static/visual-edits.js",
+    ]
+    selected = request.args.get("file", "app.py")
+    if selected not in allowed_files:
+        selected = "app.py"
+    try:
+        with open(os.path.join(app.root_path, selected), "r", encoding="utf-8") as source_file:
+            source_code = source_file.read()
+    except OSError:
+        source_code = "This source file is not available in the current deployment."
+    response = app.make_response(render_template(
+        "code_view.html", selected_file=selected, allowed_files=allowed_files,
+        source_code=source_code, user=session.get("discord_user")
+    ))
+    response.headers["Cache-Control"] = "no-store, max-age=0"
+    response.headers["X-Robots-Tag"] = "noindex, nofollow"
+    return response
+
+
 @app.route("/admin", methods=["GET", "POST"])
 def admin_editor():
     user = session.get("discord_user")
