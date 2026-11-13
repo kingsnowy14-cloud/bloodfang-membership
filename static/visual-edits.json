@@ -24,14 +24,17 @@
       "zIndex": "20"
     },
     "__visual_global_overlay__:b86752ad-06ad-41d6-b118-b9a415c47928": {
-      "position": "absolute",
+      "display": "block",
+      "height": "559px",
       "left": "992px",
+      "margin": "0",
+      "position": "absolute",
       "top": "67px",
       "width": "839px",
-      "height": "auto",
-      "margin": "0",
-      "zIndex": "20",
-      "display": "block"
+      "zIndex": "20"
+    },
+    "__visual_page_hidden__:/donate|__visual_global_overlay__:b86752ad-06ad-41d6-b118-b9a415c47928": {
+      "display": "none"
     }
   }
 }
