@@ -46,7 +46,7 @@
       const layout = data.layout || {};
       const images = data.images || {};
       const styles = data.styles || {};
-      if (styles['__visual_global__']) Object.assign(document.body.style, styles['__visual_global__']);
+      if (styles['__visual_global__']) { const g=styles['__visual_global__']; Object.assign(document.body.style,g); let tag=document.getElementById('ve-global-style'); if(!tag){tag=document.createElement('style');tag.id='ve-global-style';document.head.appendChild(tag);} tag.textContent=(g.color?'body *{color:'+g.color+'!important;}':'')+(g.background?'html,body{background:'+g.background+'!important;}':''); }
       if (styles[key(document.body)]) Object.assign(document.body.style, styles[key(document.body)]);
       document.querySelectorAll('body *').forEach(el => {
         const id = key(el);
