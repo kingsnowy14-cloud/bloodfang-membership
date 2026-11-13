@@ -26,7 +26,7 @@
 <main>
   <section class="hero store-hero">
     <div class="eyebrow">THE ISLE: EVRIMA · BLOODFANG STORE</div>
-    <h1>{{ hero_title.split('\n')[0] }}<br><span>{{ hero_title.split('\n')[1] if '\n' in hero_title else '' }}</span></h1>
+    <h1>{{ hero_title.splitlines()[0] }}<br><span>{{ hero_title.splitlines()[1] if hero_title.splitlines()|length > 1 else '' }}</span></h1>
     <p>{{ hero_description }}</p>
     <div class="store-actions">
       <a class="primary" href="#memberships">Shop memberships <span>↓</span></a>
