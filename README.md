@@ -50,12 +50,12 @@ Keep these settings on the existing service; do not create a duplicate service f
 
 | Rank | Monthly price | Listed Bloodpoints/day | Listed storage |
 |---|---:|---:|---:|
-| STALKER | €4.99 | 25,000 | 5 |
-| WARLORD | €12.99 | 100,000 | 8 |
-| APEX | €19.99 | 200,000 | 9 |
-| BLOOD EMPEROR | €29.99 | 350,000 | 10 |
-| BLOOD TITAN | €50.00 | 1,000,000 | 13 |
-| BLOOD GOD | €120.00 | 2,000,000 | 20 |
+| STALKER | €5 | 25,000 | 3 |
+| WARLORD | €15 | 100,000 | 5 |
+| APEX | €20 | 200,000 | 6 |
+| BLOOD EMPEROR | €30 | 350,000 | 8 |
+| BLOOD TITAN | €50 | 1,000,000 | 12 |
+| BLOOD GOD | €100 | 2,000,000 | 20 |
 
 ## Security and scope
 
