@@ -22,7 +22,8 @@
   }
   function editable(el){
     if(!el||!el.isConnected||el.closest('.visual-editor-bar,.visual-edit-launch,script,style,select,option,input,textarea,svg'))return false;
-    return ['A','BUTTON','H1','H2','H3','P','SMALL','STRONG','SPAN','LABEL','DIV','FOOTER','LI','TD','TH'].includes(el.tagName)
+    if(['A','BUTTON'].includes(el.tagName))return el.textContent.trim().length>0;
+    return ['H1','H2','H3','P','SMALL','STRONG','SPAN','LABEL','DIV','FOOTER','LI','TD','TH'].includes(el.tagName)
       && el.children.length===0 && Array.from(el.childNodes).some(n=>n.nodeType===Node.TEXT_NODE&&n.textContent.trim());
   }
   function apply(){
