@@ -2,7 +2,7 @@
   const launch = document.getElementById('visualEditLaunch');
   const csrfMeta = document.querySelector('meta[name="visual-editor-csrf"]');
   if (!launch || !csrfMeta) return;
-  let changes = {}, csrf = csrfMeta.content, active = false, dirty = false, current = null;
+  let changes = {}, tierPrices = {}, csrf = csrfMeta.content, active = false, dirty = false, current = null;
   const bar = document.createElement('div');
   bar.className = 'visual-editor-bar';
   bar.innerHTML = '<span>Bearbeitungsmodus · Text anklicken</span><span class="visual-editor-status" aria-live="polite">Bereit</span><button type="button" class="secondary" data-action="cancel">Abbrechen</button><button type="button" data-action="save">Speichern</button>';
@@ -34,7 +34,7 @@
       nodes.forEach(el => {
         if (!eligible(el)) return;
         const key = elementKey(el);
-        if (Object.prototype.hasOwnProperty.call(changes, key)) el.textContent = changes[key];
+        if (Object.prototype.hasOwnProperty.call(changes, key)) el.textContent = changes[key];\n        if (el.dataset.tierPrice && tierPrices[el.dataset.tierPrice]) el.textContent = '€' + tierPrices[el.dataset.tierPrice];
       });
     });
   }
@@ -49,7 +49,7 @@
   function finishCurrent() {
     if (!current) return;
     const key = current.dataset.visualKey, value = current.textContent;
-    if (key && changes[key] !== value) { changes[key] = value; dirty = true; status.textContent = 'Nicht gespeichert'; }
+    if (key && changes[key] !== value) { changes[key] = value; dirty = true; status.textContent = 'Nicht gespeichert'; }\n    if (current.dataset.tierPrice) { const match = value.match(/(\\d{1,4},\\d{2})/); if (match) { tierPrices[current.dataset.tierPrice] = match[1]; dirty = true; } }
     current.removeAttribute('contenteditable'); current = null;
   }
   function startEditing(el) {
@@ -67,7 +67,7 @@
     if (!dirty) { status.textContent = 'Alles gespeichert'; return; }
     saveButton.disabled = true; status.textContent = 'Speichert …';
     try {
-      const response = await fetch('/api/visual-editor', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({csrf,changes})});
+      const response = await fetch('/api/visual-editor', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({csrf,changes,tierPrices})});
       if (!response.ok) throw new Error('Speichern fehlgeschlagen');
       dirty = false; status.textContent = 'Gespeichert ✓';
     } catch (error) { status.textContent = 'Fehler beim Speichern'; }
