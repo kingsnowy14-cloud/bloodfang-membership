@@ -69,7 +69,7 @@ def get_tiers():
             saved_prices = json.loads(row["value"])
             for tier in tiers:
                 value = saved_prices.get(tier["name"])
-                if isinstance(value, str) and __import__("re").fullmatch(r"\\d{1,4},\\d{2}", value):
+                if isinstance(value, str) and __import__("re").fullmatch(r"\d{1,4},\d{2}", value):
                     tier["price"] = value
         except (TypeError, ValueError):
             pass
@@ -127,7 +127,7 @@ def visual_editor_api():
     for tier_name, price in tier_prices.items():
         if tier_name not in {tier["name"] for tier in TIERS} or not isinstance(price, str):
             return jsonify({"error": "invalid tier price"}), 400
-        if not __import__("re").fullmatch(r"\\d{1,4},\\d{2}", price):
+        if not __import__("re").fullmatch(r"\d{1,4},\d{2}", price):
             return jsonify({"error": "price must use format 0,00"}), 400
         clean_prices[tier_name] = price
     with db_connect() as db:
