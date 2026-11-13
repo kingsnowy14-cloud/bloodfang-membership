@@ -17,5 +17,30 @@
   "images": {
     "__visual_overlay__:ccd36bd3-a337-4420-b7e5-9f000c0496ee": "/uploads/bfcb5d1219cd9b61e1a301ce6daf5548.png",
     "__visual_overlay__:fb6025c7-a466-45ee-ac64-29dea16cf8c9": "/uploads/26167117b0394fcd7b8e209cc339d221.png"
+  },
+  "styles": {
+    "/|main:0/section:0/div:2": {
+      "display": "none"
+    },
+    "__visual_overlay__:ccd36bd3-a337-4420-b7e5-9f000c0496ee": {
+      "display": "block",
+      "height": "auto",
+      "left": "73px",
+      "margin": "0",
+      "position": "absolute",
+      "top": "53px",
+      "width": "66px",
+      "zIndex": "20"
+    },
+    "__visual_overlay__:fb6025c7-a466-45ee-ac64-29dea16cf8c9": {
+      "display": "block",
+      "height": "549px",
+      "left": "71px",
+      "margin": "0",
+      "position": "absolute",
+      "top": "132px",
+      "width": "823px",
+      "zIndex": "20"
+    }
   }
 }
