@@ -12,6 +12,7 @@ from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SESSION_SECRET") or secrets.token_hex(32)
+app.config["MAX_CONTENT_LENGTH"] = 9 * 1024 * 1024
 
 DISCORD_CLIENT_ID = os.environ.get("DISCORD_CLIENT_ID", "")
 DISCORD_CLIENT_SECRET = os.environ.get("DISCORD_CLIENT_SECRET", "")
@@ -321,18 +322,33 @@ def visual_editor_upload():
     }
     if not signatures.get(extension):
         return jsonify({"error": "Die Datei ist kein gültiges Bild."}), 400
-    upload_dir = "/data/uploads" if os.path.isdir("/data") else os.path.join(app.root_path, "static", "uploads")
-    os.makedirs(upload_dir, exist_ok=True)
     filename = secrets.token_hex(16) + "." + extension
-    with open(os.path.join(upload_dir, filename), "wb") as target:
-        target.write(data)
+    persistent_dir = "/data/uploads"
+    fallback_dir = os.path.join(app.root_path, "static", "uploads")
+    saved = False
+    for upload_dir in ([persistent_dir, fallback_dir] if os.path.isdir("/data") else [fallback_dir]):
+        try:
+            os.makedirs(upload_dir, exist_ok=True)
+            with open(os.path.join(upload_dir, filename), "wb") as target:
+                target.write(data)
+                target.flush()
+                os.fsync(target.fileno())
+            saved = True
+            break
+        except OSError:
+            app.logger.exception("Image upload storage unavailable: %s", upload_dir)
+    if not saved:
+        return jsonify({"error": "Der Server kann das Bild derzeit nicht speichern. Bitte Administrator informieren."}), 500
     return jsonify({"ok": True, "url": "/uploads/" + filename})
 
 
 @app.get("/uploads/<path:filename>")
 def visual_editor_uploaded_image(filename):
-    upload_dir = "/data/uploads" if os.path.isdir("/data") else os.path.join(app.root_path, "static", "uploads")
-    return send_from_directory(upload_dir, filename)
+    from werkzeug.exceptions import NotFound
+    for upload_dir in ("/data/uploads", os.path.join(app.root_path, "static", "uploads")):
+        if os.path.isfile(os.path.join(upload_dir, filename)):
+            return send_from_directory(upload_dir, filename)
+    raise NotFound()
 
 
 @app.route("/admin", methods=["GET", "POST"])
