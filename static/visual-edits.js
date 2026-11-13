@@ -66,7 +66,7 @@
       if (styles[key(document.body)] || styles[legacyKey(document.body)]) Object.assign(document.body.style, styles[key(document.body)] || styles[legacyKey(document.body)]);
       document.querySelectorAll('body *').forEach(el => {
         const id = key(el), old = legacyKey(el);
-        const image = images[id] || images[old], position = layout[id] || layout[old], style = Object.assign({}, styles[id] || {}, styles[old] || {});
+        const image = images[id] || images[old], position = layout[old] || layout[id], style = Object.assign({}, styles[id] || {}, styles[old] || {});
         const content = Object.prototype.hasOwnProperty.call(changes, id) ? changes[id] : changes[old];
         if (el.tagName === 'IMG' && image) el.src = image;
         if (el.dataset.tierPrice && prices[el.dataset.tierPrice]) el.textContent = '€' + prices[el.dataset.tierPrice];
@@ -84,9 +84,9 @@
           document.body.appendChild(img);
         }
         img.src = images[id];
-        const hidden = styles['__visual_page_hidden__:' + page + '|' + id];
-        Object.assign(img.style, styles[id] || {}, hidden || {});
-        if (layout[id]) img.style.transform = 'translate(' + layout[id].x + 'px,' + layout[id].y + 'px)';
+        const local = legacyKey(img), hidden = styles['__visual_page_hidden__:' + page + '|' + id], position = layout[local] || layout[id];
+        Object.assign(img.style, styles[id] || {}, styles[local] || {}, hidden || {});
+        if (position) img.style.transform = 'translate(' + position.x + 'px,' + position.y + 'px)';
       });
     })
     .catch(() => {});
