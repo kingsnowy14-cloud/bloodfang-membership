@@ -3,6 +3,7 @@ import json
 import base64
 import secrets
 import asyncio
+import threading
 from urllib.parse import urlencode
 import urllib.request
 
@@ -105,6 +106,17 @@ def inject_visual_editor():
         session["visual_editor_csrf"] = token
     return {"visual_editor_admin": enabled, "visual_editor_csrf": token}
 
+
+
+_visual_backup_lock = threading.Lock()
+
+def sync_visual_backup_in_background(changes, tier_prices, layout, images, styles):
+    # Serialize backup writes so rapid saves cannot overwrite a newer snapshot.
+    with _visual_backup_lock:
+        try:
+            commit_visual_edits_to_github(changes, tier_prices, layout, images, styles)
+        except Exception:
+            app.logger.exception("Background visual editor backup failed")
 
 
 def commit_visual_edits_to_github(changes, tier_prices, layout, images=None, styles=None):
@@ -270,13 +282,16 @@ def visual_editor_api():
                 "ON CONFLICT(key) DO UPDATE SET value=excluded.value",
                 (json.dumps(merged_prices, ensure_ascii=False),),
             )
-    try:
-        # Back up the complete editor state, not only fields changed in this request.
-        github_synced = commit_visual_edits_to_github(clean, merged_prices, clean_layout, clean_images, clean_styles)
-    except Exception:
-        app.logger.exception("Could not commit visual editor changes to GitHub main")
-        github_synced = False
-    return jsonify({"ok": True, "saved": len(clean), "prices": len(clean_prices), "positions": len(clean_layout), "githubSynced": github_synced})
+    # The database is the fast, durable primary save. GitHub backup runs after
+    # the response in a background thread, so slow GitHub API calls do not block the editor.
+    backup_snapshot = (clean.copy(), merged_prices.copy(), clean_layout.copy(), clean_images.copy(), clean_styles.copy())
+    threading.Thread(
+        target=sync_visual_backup_in_background,
+        args=backup_snapshot,
+        daemon=True,
+        name="visual-editor-github-backup",
+    ).start()
+    return jsonify({"ok": True, "saved": len(clean), "prices": len(clean_prices), "positions": len(clean_layout), "githubSynced": False, "githubSyncQueued": True})
 
 
 @app.get("/api/visual-edits-public")
