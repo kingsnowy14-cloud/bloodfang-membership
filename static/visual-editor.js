@@ -1,5 +1,6 @@
 (() => {
   const meta=document.querySelector('meta[name="visual-editor-csrf"]');if(!meta)return;
+  const editorPickStyle=document.createElement('style');editorPickStyle.textContent='.visual-editing .hero-mark{pointer-events:auto!important;cursor:pointer!important}.visual-editing .hero-mark:hover{outline:2px dashed #e34b5d!important;outline-offset:4px!important}';document.head.appendChild(editorPickStyle);
   let changes={},tierPrices={},layout={},images={},styles={},csrf=meta.content,active=false,dirty=false,current=null,drag=null,resizing=null,selectedImage=null,savedRange=null,logoMode=false,suppressImageClick=false,insertionAnchor=null,lastClickX=0,lastClickY=0;
   const page=location.pathname.replace(/\/$/,'')||'/';
   const imageResizeObserver=typeof ResizeObserver!=='undefined'?new ResizeObserver(entries=>{for(const entry of entries){const img=entry.target;if(!img.isConnected||img.tagName!=='IMG')continue;const w=Math.round(entry.contentRect.width),h=Math.round(entry.contentRect.height);if(w<20||h<10)continue;const k=img.dataset.veOverlayKey||key(img);styles[k]=styles[k]||{};styles[k].width=w+'px';styles[k].height=h+'px';img.setAttribute('width',String(w));mark();}}):null;
