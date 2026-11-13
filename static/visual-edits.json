@@ -1,5 +1,8 @@
 {
-  "content": {},
+  "content": {
+    "/|main:0/section:0/h1:0/span:1": "",
+    "/|main:0/section:0/h1:0/span:0": "<u><i>SUPPORT THE PACK</i></u>."
+  },
   "tierPrices": {},
   "layout": {
     "__visual_overlay__:ccd36bd3-a337-4420-b7e5-9f000c0496ee": {
@@ -7,7 +10,7 @@
       "y": -45.0
     },
     "__visual_overlay__:fb6025c7-a466-45ee-ac64-29dea16cf8c9": {
-      "x": 1091.0,
+      "x": 946.0,
       "y": -14.0
     }
   },
