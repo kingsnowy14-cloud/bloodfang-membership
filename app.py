@@ -156,7 +156,8 @@ def visual_editor_api():
         except (TypeError, ValueError):
             layout = {}
         session["visual_editor_csrf"] = session.get("visual_editor_csrf") or secrets.token_urlsafe(32)
-        image_row = db.execute("SELECT value FROM app_settings WHERE key='visual_editor_images'").fetchone()
+        with db_connect() as db:
+            image_row = db.execute("SELECT value FROM app_settings WHERE key='visual_editor_images'").fetchone()
         try:
             images = json.loads(image_row["value"]) if image_row else {}
         except (TypeError, ValueError):
