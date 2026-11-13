@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#0c0b0d">
-  {% if is_admin %}<meta name="visual-editor-csrf" content="{{ editor_csrf }}">{% endif %}
+  {% if is_admin %}<meta name="visual-editor-csrf" content="{{ visual_editor_csrf }}">{% endif %}
   <meta name="description" content="BLOODFANG Store — memberships, Bloodpoints and donations for The Isle: Evrima.">
   <title>BLOODFANG STORE | The Isle: Evrima</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
@@ -111,5 +111,5 @@
   });
 })();
 </script>
-{% if is_admin %}<script src="{{ url_for('static', filename='visual-editor.js') }}" defer></script>{% endif %}
+{% if visual_editor_admin %}<script src="{{ url_for('static', filename='visual-editor.js') }}" defer></script>{% endif %}
 </body></html>
