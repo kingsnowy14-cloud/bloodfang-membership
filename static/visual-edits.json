@@ -1,7 +1,9 @@
 {
   "content": {
     "/|main:0/section:0/h1:0/span:0": "<u><i>SUPPORT THE PACK</i></u>.",
-    "/|main:0/section:0/h1:0/span:1": ""
+    "/|main:0/section:0/h1:0/span:1": "",
+    "__visual_shared__|main:0/section:0/div:1/a:1": "Browse Bloodpoints <span>↗</span>",
+    "__visual_shared__|main:0/section:0/div:1/a:0": "Shop memberships <span>↓</span>"
   },
   "tierPrices": {},
   "layout": {
@@ -30,6 +32,9 @@
       "height": "560px",
       "width": "840px"
     },
+    "/|main:0/section:0/div:1": {
+      "background": "linear-gradient(135deg, #251018, #0c0b0d)"
+    },
     "/|main:0/section:0/div:2": {
       "display": "none"
     },
@@ -56,8 +61,16 @@
     "__visual_page_hidden__:/donate|__visual_global_overlay__:b86752ad-06ad-41d6-b118-b9a415c47928": {
       "display": "none"
     },
-    "/|main:0/section:0/div:1": {
-      "background": "linear-gradient(135deg, #251018, #0c0b0d)"
+    "/|main:0/section:0/div:1/a:1": {
+      "borderRadius": "40px",
+      "borderColor": "#000000",
+      "color": "#fd3737",
+      "background": "#000000"
+    },
+    "/|main:0/section:0/div:1/a:0": {
+      "borderRadius": "40px",
+      "background": "#ff2429",
+      "color": "#000000"
     }
   }
 }
