@@ -196,7 +196,7 @@ def visual_editor_api():
     if not isinstance(styles, dict) or len(styles) > 500:
         return jsonify({"error": "invalid styles"}), 400
     clean_styles = {}
-    allowed_style_keys = {"color", "background", "fontSize", "fontFamily", "fontWeight", "fontStyle", "textDecoration", "textAlign", "width", "height"}
+    allowed_style_keys = {"color", "background", "fontSize", "fontFamily", "fontWeight", "fontStyle", "textDecoration", "textAlign", "width", "height", "position", "left", "top", "margin", "zIndex", "display", "objectFit"}
     for key, style in styles.items():
         if not isinstance(key, str) or len(key) > 600 or not isinstance(style, dict):
             return jsonify({"error": "invalid style"}), 400
@@ -204,7 +204,7 @@ def visual_editor_api():
         for name, value in style.items():
             if name not in allowed_style_keys or not isinstance(value, str) or len(value) > 180:
                 return jsonify({"error": "invalid style property"}), 400
-            if name in {"color", "background"} and not all(c.isalnum() or c in "#(),.% -/" for c in value):
+            if name in {"color", "background", "position", "left", "top", "margin", "zIndex", "display", "objectFit"} and not all(c.isalnum() or c in "#(),.% -/" for c in value):
                 return jsonify({"error": "invalid color"}), 400
             clean_style[name] = value
         clean_styles[key] = clean_style
@@ -238,42 +238,24 @@ def visual_editor_api():
             "ON CONFLICT(key) DO UPDATE SET value=excluded.value",
             (json.dumps(clean, ensure_ascii=False),),
         )
-        if clean_layout:
-            old_layout = db.execute("SELECT value FROM app_settings WHERE key='visual_editor_layout'").fetchone()
-            try:
-                merged_layout = json.loads(old_layout["value"]) if old_layout else {}
-            except (TypeError, ValueError):
-                merged_layout = {}
-            merged_layout.update(clean_layout)
-            db.execute(
-                "INSERT INTO app_settings(key,value) VALUES('visual_editor_layout',?) "
-                "ON CONFLICT(key) DO UPDATE SET value=excluded.value",
-                (json.dumps(merged_layout, ensure_ascii=False),),
-            )
-        if clean_styles:
-            old_styles = db.execute("SELECT value FROM app_settings WHERE key='visual_editor_styles'").fetchone()
-            try:
-                merged_styles = json.loads(old_styles["value"]) if old_styles else {}
-            except (TypeError, ValueError):
-                merged_styles = {}
-            merged_styles.update(clean_styles)
-            db.execute(
-                "INSERT INTO app_settings(key,value) VALUES('visual_editor_styles',?) "
-                "ON CONFLICT(key) DO UPDATE SET value=excluded.value",
-                (json.dumps(merged_styles, ensure_ascii=False),),
-            )
-        if clean_images:
-            old_images = db.execute("SELECT value FROM app_settings WHERE key='visual_editor_images'").fetchone()
-            try:
-                merged_images = json.loads(old_images["value"]) if old_images else {}
-            except (TypeError, ValueError):
-                merged_images = {}
-            merged_images.update(clean_images)
-            db.execute(
-                "INSERT INTO app_settings(key,value) VALUES('visual_editor_images',?) "
-                "ON CONFLICT(key) DO UPDATE SET value=excluded.value",
-                (json.dumps(merged_images, ensure_ascii=False),),
-            )
+        merged_layout = clean_layout
+        db.execute(
+            "INSERT INTO app_settings(key,value) VALUES('visual_editor_layout',?) "
+            "ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+            (json.dumps(merged_layout, ensure_ascii=False),),
+        )
+        merged_styles = clean_styles
+        db.execute(
+            "INSERT INTO app_settings(key,value) VALUES('visual_editor_styles',?) "
+            "ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+            (json.dumps(merged_styles, ensure_ascii=False),),
+        )
+        merged_images = clean_images
+        db.execute(
+            "INSERT INTO app_settings(key,value) VALUES('visual_editor_images',?) "
+            "ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+            (json.dumps(merged_images, ensure_ascii=False),),
+        )
         if clean_prices:
             existing_row = db.execute("SELECT value FROM app_settings WHERE key='tier_prices'").fetchone()
             try:
