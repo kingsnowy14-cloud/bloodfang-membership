@@ -107,14 +107,14 @@ def inject_visual_editor():
 
 
 
-def commit_visual_edits_to_github(changes, tier_prices, layout, images=None):
+def commit_visual_edits_to_github(changes, tier_prices, layout, images=None, styles=None):
     token = (os.environ.get("GITHUB_TOKEN") or os.environ.get("GITHUB_BACKUP_TOKEN", "")).strip()
     if not token:
         return False
     repo = os.environ.get("GITHUB_REPOSITORY", "kingsnowy14-cloud/bloodfang-membership").strip()
     path = "static/visual-edits.json"
     api = f"https://api.github.com/repos/{repo}/contents/{path}"
-    body = json.dumps({"content": changes, "tierPrices": tier_prices, "layout": layout, "images": images or {}},
+    body = json.dumps({"content": changes, "tierPrices": tier_prices, "layout": layout, "images": images or {}, "styles": styles or {}},
                       ensure_ascii=False, indent=2).encode("utf-8")
     headers = {"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json",
                "X-GitHub-Api-Version": "2022-11-28", "User-Agent": "Bloodfang-Visual-Editor"}
@@ -139,36 +139,33 @@ def visual_editor_api():
     if not is_visual_editor_admin():
         return jsonify({"error": "forbidden"}), 403
     if request.method == "GET":
-        with db_connect() as db:
-            row = db.execute("SELECT value FROM app_settings WHERE key='visual_editor_content'").fetchone()
+        # GitHub backup is the recovery source when the persistent DB has no saved value.
+        backup = {}
         try:
-            changes = json.loads(row["value"]) if row else {}
-        except (TypeError, ValueError):
-            changes = {}
-        with db_connect() as db:
-            price_row = db.execute("SELECT value FROM app_settings WHERE key='tier_prices'").fetchone()
-            layout_row = db.execute("SELECT value FROM app_settings WHERE key='visual_editor_layout'").fetchone()
-        try:
-            tier_prices = json.loads(price_row["value"]) if price_row else {}
-        except (TypeError, ValueError):
-            tier_prices = {}
-        try:
-            layout = json.loads(layout_row["value"]) if layout_row else {}
-        except (TypeError, ValueError):
-            layout = {}
+            with open(os.path.join(app.root_path, "static", "visual-edits.json"), "r", encoding="utf-8") as backup_file:
+                backup = json.load(backup_file)
+            if not isinstance(backup, dict):
+                backup = {}
+        except (OSError, TypeError, ValueError):
+            backup = {}
+
+        def read_saved_value(db_key, backup_key, default=None):
+            with db_connect() as db:
+                saved_row = db.execute("SELECT value FROM app_settings WHERE key=?", (db_key,)).fetchone()
+            if saved_row:
+                try:
+                    return json.loads(saved_row["value"])
+                except (TypeError, ValueError):
+                    pass
+            value = backup.get(backup_key, default if default is not None else {})
+            return value if isinstance(value, (dict, list)) else (default if default is not None else {})
+
+        changes = read_saved_value("visual_editor_content", "content")
+        tier_prices = read_saved_value("tier_prices", "tierPrices")
+        layout = read_saved_value("visual_editor_layout", "layout")
+        images = read_saved_value("visual_editor_images", "images")
+        styles = read_saved_value("visual_editor_styles", "styles")
         session["visual_editor_csrf"] = session.get("visual_editor_csrf") or secrets.token_urlsafe(32)
-        with db_connect() as db:
-            image_row = db.execute("SELECT value FROM app_settings WHERE key='visual_editor_images'").fetchone()
-        try:
-            images = json.loads(image_row["value"]) if image_row else {}
-        except (TypeError, ValueError):
-            images = {}
-        with db_connect() as db:
-            style_row = db.execute("SELECT value FROM app_settings WHERE key='visual_editor_styles'").fetchone()
-        try:
-            styles = json.loads(style_row["value"]) if style_row else {}
-        except (TypeError, ValueError):
-            styles = {}
         return jsonify({"changes": changes, "tierPrices": tier_prices, "layout": layout, "images": images, "styles": styles, "csrf": session["visual_editor_csrf"]})
 
     payload = request.get_json(silent=True) or {}
@@ -261,12 +258,12 @@ def visual_editor_api():
             "ON CONFLICT(key) DO UPDATE SET value=excluded.value",
             (json.dumps(merged_images, ensure_ascii=False),),
         )
+        existing_row = db.execute("SELECT value FROM app_settings WHERE key='tier_prices'").fetchone()
+        try:
+            merged_prices = json.loads(existing_row["value"]) if existing_row else {}
+        except (TypeError, ValueError):
+            merged_prices = {}
         if clean_prices:
-            existing_row = db.execute("SELECT value FROM app_settings WHERE key='tier_prices'").fetchone()
-            try:
-                merged_prices = json.loads(existing_row["value"]) if existing_row else {}
-            except (TypeError, ValueError):
-                merged_prices = {}
             merged_prices.update(clean_prices)
             db.execute(
                 "INSERT INTO app_settings(key,value) VALUES('tier_prices',?) "
@@ -274,7 +271,8 @@ def visual_editor_api():
                 (json.dumps(merged_prices, ensure_ascii=False),),
             )
     try:
-        github_synced = commit_visual_edits_to_github(clean, merged_prices if clean_prices else {}, merged_layout if clean_layout else {}, merged_images if clean_images else {})
+        # Back up the complete editor state, not only fields changed in this request.
+        github_synced = commit_visual_edits_to_github(clean, merged_prices, clean_layout, clean_images, clean_styles)
     except Exception:
         app.logger.exception("Could not commit visual editor changes to GitHub main")
         github_synced = False
