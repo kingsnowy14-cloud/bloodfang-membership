@@ -73,7 +73,7 @@
   });
   document.addEventListener('click',e=>{
     if(!active||e.target.closest('.visual-editor-bar,.visual-edit-launch'))return;
-    if(drag&&drag.moved){e.preventDefault();e.stopPropagation();drag=null;return;}
+    if(suppressClick){suppressClick=false;e.preventDefault();e.stopPropagation();return;}
     let el=e.target;while(el&&el!==document.body&&!editable(el))el=el.parentElement;
     if(el&&el!==document.body){e.preventDefault();e.stopPropagation();start(el);}
   },true);
@@ -90,7 +90,7 @@
     drag.moved=true;const pos={x:Math.round(drag.x+dx),y:Math.round(drag.y+dy)};
     drag.el.style.transform='translate('+pos.x+'px,'+pos.y+'px)';drag.el.dataset.visualMovable='1';layout[drag.k]=pos;markDirty();
   },true);
-  document.addEventListener('pointerup',()=>{if(drag){if(drag.moved)status.textContent='Position geändert';drag=null;}},true);
+  document.addEventListener('pointerup',()=>{if(drag){if(drag.moved){status.textContent='Position geändert';suppressClick=true;}drag=null;}},true);
   document.addEventListener('keydown',e=>{
     if(active&&e.key==='Escape'&&current){current.textContent=changes[current.dataset.visualKey]??current.textContent;current.removeAttribute('contenteditable');current=null;}
     if(active&&(e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='s'){e.preventDefault();save();}
