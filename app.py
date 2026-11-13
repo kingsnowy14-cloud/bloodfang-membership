@@ -205,7 +205,7 @@ def visual_editor_api():
     if not isinstance(styles, dict) or len(styles) > 500:
         return jsonify({"error": "invalid styles"}), 400
     clean_styles = {}
-    allowed_style_keys = {"color", "background", "fontSize", "fontFamily", "fontWeight", "fontStyle", "textDecoration", "textAlign", "width", "height", "position", "left", "top", "margin", "zIndex", "display", "objectFit"}
+    allowed_style_keys = {"color", "background", "borderColor", "borderRadius", "fontSize", "fontFamily", "fontWeight", "fontStyle", "textDecoration", "textAlign", "width", "height", "position", "left", "top", "margin", "zIndex", "display", "objectFit"}
     for key, style in styles.items():
         if not isinstance(key, str) or len(key) > 600 or not isinstance(style, dict):
             return jsonify({"error": "invalid style"}), 400
@@ -218,7 +218,7 @@ def visual_editor_api():
                 is_gradient = bool(__import__("re").fullmatch(r"linear-gradient\(\s*\d{1,3}deg,\s*#[0-9a-fA-F]{3,8},\s*#[0-9a-fA-F]{3,8}\s*\)", value))
                 if not (is_hex or is_gradient):
                     return jsonify({"error": "invalid background value"}), 400
-            elif name in {"color", "position", "left", "top", "margin", "zIndex", "display", "objectFit"} and not all(c.isalnum() or c in "#(),.% -/" for c in value):
+            elif name in {"color", "borderColor", "borderRadius", "position", "left", "top", "margin", "zIndex", "display", "objectFit"} and not all(c.isalnum() or c in "#(),.% -/" for c in value):
                 return jsonify({"error": "invalid style value"}), 400
             clean_style[name] = value
         clean_styles[key] = clean_style
