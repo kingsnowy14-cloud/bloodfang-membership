@@ -4,6 +4,7 @@ import base64
 import secrets
 import asyncio
 import threading
+import html
 from urllib.parse import urlencode
 import urllib.request
 
@@ -385,6 +386,64 @@ def visual_editor_uploaded_image(filename):
         if os.path.isfile(os.path.join(upload_dir, filename)):
             return send_from_directory(upload_dir, filename)
     raise NotFound()
+
+
+@app.before_request
+def track_website_page_view():
+    # Anonymous aggregate page counts only: no IP addresses, account IDs or fingerprints.
+    if request.method != "GET":
+        return
+    path = request.path or "/"
+    if path.startswith(("/static/", "/api/", "/uploads/", "/auth/")) or path in {"/favicon.ico", "/robots.txt"}:
+        return
+    try:
+        with db_connect() as db:
+            db.execute("""CREATE TABLE IF NOT EXISTS website_page_views (
+                day TEXT NOT NULL,
+                path TEXT NOT NULL,
+                views INTEGER NOT NULL DEFAULT 0,
+                PRIMARY KEY(day, path)
+            )""")
+            db.execute("""INSERT INTO website_page_views(day,path,views)
+                VALUES(date('now'),?,1)
+                ON CONFLICT(day,path) DO UPDATE SET views=views+1""", (path[:300],))
+    except Exception:
+        app.logger.exception("Could not record website page view")
+
+
+@app.get("/admin/website-statistics")
+def website_statistics():
+    if not is_visual_editor_admin():
+        return render_template("message.html", title="Access denied",
+                               message="Your Discord account is not authorized to view website statistics."), 403
+    with db_connect() as db:
+        db.execute("""CREATE TABLE IF NOT EXISTS website_page_views (
+            day TEXT NOT NULL, path TEXT NOT NULL, views INTEGER NOT NULL DEFAULT 0,
+            PRIMARY KEY(day, path)
+        )""")
+        total = db.execute("SELECT COALESCE(SUM(views),0) FROM website_page_views").fetchone()[0]
+        today = db.execute("SELECT COALESCE(SUM(views),0) FROM website_page_views WHERE day=date('now')").fetchone()[0]
+        daily = db.execute("SELECT day,SUM(views) FROM website_page_views GROUP BY day ORDER BY day DESC LIMIT 30").fetchall()
+        pages = db.execute("SELECT path,SUM(views) AS views FROM website_page_views GROUP BY path ORDER BY views DESC LIMIT 20").fetchall()
+    rows = "".join(f"<tr><td>{html.escape(str(day))}</td><td>{int(count)}</td></tr>" for day,count in daily)
+    page_rows = "".join(f"<tr><td>{html.escape(str(path))}</td><td>{int(count)}</td></tr>" for path,count in pages)
+    document = f"""<!doctype html><html lang="de"><meta charset="utf-8"><meta name="viewport" content="width=device-width">
+    <title>Website-Statistik · BLOODFANG</title><style>
+    body{{margin:0;padding:32px;background:#100d10;color:#f7edf0;font:15px Arial,sans-serif}}
+    main{{max-width:900px;margin:auto}}h1{{color:#ef526b}}.cards{{display:flex;gap:14px;flex-wrap:wrap}}
+    .card{{background:#21171c;border:1px solid #57313e;border-radius:12px;padding:20px;min-width:180px}}
+    strong{{display:block;font-size:32px;margin-top:8px}}table{{width:100%;border-collapse:collapse;margin:18px 0 30px}}
+    th,td{{padding:11px;text-align:left;border-bottom:1px solid #39262d}}a{{color:#ff8da0}}
+    </style><main><p><a href="/">← Zur Website</a></p><h1>📊 Website-Statistik</h1>
+    <div class="cards"><div class="card">Aufrufe gesamt<strong>{int(total)}</strong></div>
+    <div class="card">Aufrufe heute<strong>{int(today)}</strong></div></div>
+    <h2>Letzte 30 Tage</h2><table><tr><th>Datum (UTC)</th><th>Seitenaufrufe</th></tr>{rows or '<tr><td colspan="2">Noch keine Daten</td></tr>'}</table>
+    <h2>Meistbesuchte Seiten</h2><table><tr><th>Seite</th><th>Aufrufe</th></tr>{page_rows or '<tr><td colspan="2">Noch keine Daten</td></tr>'}</table>
+    <p>Es werden nur aggregierte Seitenaufrufe gezählt. Es werden keine IP-Adressen oder Besucherprofile gespeichert.</p></main></html>"""
+    response = app.make_response(document)
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["X-Robots-Tag"] = "noindex, nofollow"
+    return response
 
 
 @app.get("/admin/code")
