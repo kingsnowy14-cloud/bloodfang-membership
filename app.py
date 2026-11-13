@@ -196,7 +196,7 @@ def visual_editor_api():
     if not isinstance(styles, dict) or len(styles) > 500:
         return jsonify({"error": "invalid styles"}), 400
     clean_styles = {}
-    allowed_style_keys = {"color", "background", "fontSize", "fontFamily", "fontWeight", "fontStyle", "textDecoration", "textAlign"}
+    allowed_style_keys = {"color", "background", "fontSize", "fontFamily", "fontWeight", "fontStyle", "textDecoration", "textAlign", "width", "height"}
     for key, style in styles.items():
         if not isinstance(key, str) or len(key) > 600 or not isinstance(style, dict):
             return jsonify({"error": "invalid style"}), 400
