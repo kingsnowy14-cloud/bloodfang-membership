@@ -112,3 +112,16 @@ a:focus-visible,button:focus-visible,select:focus-visible{outline:2px solid #ff6
 .navbtn.active{border-color:var(--red);background:#211317}
 .store-page .section#memberships{padding-top:55px}
 @media(max-width:760px){.store-categories{grid-template-columns:1fr;padding-top:35px}.store-category{min-height:145px}.store-hero{min-height:390px}.store-actions{align-items:stretch;flex-direction:column;max-width:300px}.store-actions .primary,.store-actions .store-secondary{justify-content:space-between}.store-bottom{padding:55px 18px}}
+
+/* In-place visual editor, visible only to allowlisted administrators */
+.visual-edit-launch{background:#8f1c34;border-color:#d72b3f;color:#fff;cursor:pointer;font:800 11px Inter,Arial,sans-serif}
+.visual-edit-launch:hover{background:#b52340}
+.visual-editor-bar{position:fixed;z-index:10000;left:50%;bottom:18px;transform:translateX(-50%);display:none;align-items:center;gap:12px;max-width:calc(100vw - 24px);padding:12px 16px;border:1px solid #8b3447;border-radius:10px;background:#171216;box-shadow:0 12px 50px #000b;color:#fff;font:600 12px Inter,Arial,sans-serif}
+.visual-editor-bar.is-visible{display:flex}
+.visual-editor-bar button{border:0;border-radius:6px;padding:10px 13px;background:#d72b3f;color:#fff;font-weight:800;cursor:pointer}
+.visual-editor-bar button.secondary{background:#302329;border:1px solid #59404a}
+.visual-editor-status{color:#c8b9be;min-width:72px}
+body.visual-editing [data-visual-editable="1"]{outline:1px dashed #e34a62;outline-offset:4px;cursor:text}
+body.visual-editing [data-visual-editable="1"]:hover{background:#d72b3f18}
+body.visual-editing [contenteditable="true"]{outline:2px solid #ff6479;background:#25151b!important;cursor:text;min-width:12px}
+@media(max-width:600px){.visual-editor-bar{width:calc(100vw - 20px);justify-content:space-between;gap:6px;padding:9px}.visual-editor-bar span{font-size:10px}.visual-editor-bar button{padding:9px 10px;font-size:10px}}
