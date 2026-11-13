@@ -10,7 +10,7 @@
 </head>
 <body>
   <main class="message checkout-panel">
-    <a class="brand" href="/">BLOOD<span>FANG</span></a>{% if visual_editor_admin %}<button class="visual-edit-launch" id="visualEditLaunch" type="button">✎ Edit website</button>{% endif %}
+    <a class="brand" href="/">BLOOD<span>FANG</span></a>{% if visual_editor_admin %}<button class="visual-edit-launch" id="visualEditLaunch" type="button">✎ Edit website</button>{% endif %}{% if visual_editor_admin %}<a class="navbtn code-view-link" href="/admin/code">⌘ View code</a>{% endif %}
 
     {% if tier is defined %}
       <div class="eyebrow checkout-eyebrow">SECURE MEMBERSHIP CHECKOUT</div>
