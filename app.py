@@ -181,7 +181,7 @@ def visual_editor_api():
         return jsonify({"error": "invalid changes"}), 400
     clean = {}
     for key, value in changes.items():
-        if not isinstance(key, str) or len(key) > 500 or not isinstance(value, str) or len(value) > 2000:
+        if not isinstance(key, str) or len(key) > 500 or not isinstance(value, str) or len(value) > 50000:
             return jsonify({"error": "invalid editor content"}), 400
         clean[key] = value
     images = payload.get("images", {})
