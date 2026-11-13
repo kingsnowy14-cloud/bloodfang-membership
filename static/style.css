@@ -213,3 +213,7 @@ body.visual-editing .ve-cursor-mark{opacity:1}
 .ve-size-control button{grid-column:1/-1;min-height:32px}
 .visual-editor-added-image{max-width:min(100%,900px);height:auto;object-fit:contain}
 @media(max-width:760px){.topbar{display:flex;flex-wrap:wrap;align-items:center;gap:10px}.topbar>.visual-edit-launch{padding:9px 10px!important;font-size:9px!important}.topbar .main-nav{width:100%}}
+
+/* Keep the editor shortcut immediately beside the brand, navigation stays right-aligned */
+.topbar{justify-content:flex-start!important}
+.topbar>.main-nav{margin-left:auto}
