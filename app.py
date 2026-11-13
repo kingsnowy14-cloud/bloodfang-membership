@@ -449,19 +449,19 @@ def website_statistics():
         pages = db.execute("SELECT path,SUM(views) AS views FROM website_page_views GROUP BY path ORDER BY views DESC LIMIT 20").fetchall()
     rows = "".join(f"<tr><td>{html.escape(str(day))}</td><td>{int(count)}</td></tr>" for day,count in daily)
     page_rows = "".join(f"<tr><td>{html.escape(str(path))}</td><td>{int(count)}</td></tr>" for path,count in pages)
-    document = f"""<!doctype html><html lang="de"><meta charset="utf-8"><meta name="viewport" content="width=device-width">
-    <title>Website-Statistik · BLOODFANG</title><style>
+    document = f"""<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width">
+    <title>Website Statistics · BLOODFANG</title><style>
     body{{margin:0;padding:32px;background:#100d10;color:#f7edf0;font:15px Arial,sans-serif}}
     main{{max-width:900px;margin:auto}}h1{{color:#ef526b}}.cards{{display:flex;gap:14px;flex-wrap:wrap}}
     .card{{background:#21171c;border:1px solid #57313e;border-radius:12px;padding:20px;min-width:180px}}
     strong{{display:block;font-size:32px;margin-top:8px}}table{{width:100%;border-collapse:collapse;margin:18px 0 30px}}
     th,td{{padding:11px;text-align:left;border-bottom:1px solid #39262d}}a{{color:#ff8da0}}
-    </style><main><p><a href="/">← Zur Website</a></p><h1>📊 Website-Statistik</h1>
-    <div class="cards"><div class="card">Aufrufe gesamt<strong>{int(total)}</strong></div>
-    <div class="card">Aufrufe heute<strong>{int(today)}</strong></div></div>
-    <h2>Letzte 30 Tage</h2><table><tr><th>Datum (UTC)</th><th>Seitenaufrufe</th></tr>{rows or '<tr><td colspan="2">Noch keine Daten</td></tr>'}</table>
-    <h2>Meistbesuchte Seiten</h2><table><tr><th>Seite</th><th>Aufrufe</th></tr>{page_rows or '<tr><td colspan="2">Noch keine Daten</td></tr>'}</table>
-    <p>Es werden nur aggregierte Seitenaufrufe gezählt. Es werden keine IP-Adressen oder Besucherprofile gespeichert.</p></main></html>"""
+    </style><main><p><a href="/">← Back to website</a></p><h1>📊 Website Statistics</h1>
+    <div class="cards"><div class="card">Total page views<strong>{int(total)}</strong></div>
+    <div class="card">Today<strong>{int(today)}</strong></div></div>
+    <h2>Last 30 days</h2><table><tr><th>Date (UTC)</th><th>Page views</th></tr>{rows or '<tr><td colspan="2">No data yet</td></tr>'}</table>
+    <h2>Most visited pages</h2><table><tr><th>Seite</th><th>Aufrufe</th></tr>{page_rows or '<tr><td colspan="2">Noch keine Daten</td></tr>'}</table>
+    <p>Only aggregated page views are stored. No IP addresses or visitor profiles are collected.</p></main></html>"""
     response = app.make_response(document)
     response.headers["Cache-Control"] = "no-store"
     response.headers["X-Robots-Tag"] = "noindex, nofollow"
