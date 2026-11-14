@@ -48,7 +48,7 @@ Keep these settings on the existing service; do not create a duplicate service f
 
 ## Membership tiers
 
-| Rank | Monthly price | Listed Bloodpoints/day | Listed storage |
+| Rank | Monthly subscription price | Listed Bloodpoints/day | Listed storage |
 |---|---:|---:|---:|
 | STALKER | €5.00 | 25,000 | 3 |
 | WARLORD | €15.00 | 100,000 | 5 |
@@ -87,7 +87,7 @@ Until this checklist is reviewed and all placeholders are completed, keep paymen
 
 The repository also includes `bot.py`, which responds to these commands in a server and sends the offer lists to the command user's DMs:
 
-- `!membership` — all six membership ranks, monthly prices, one-time prices, and listed benefits.
+- `!membership` — all six membership ranks, monthly subscription prices and listed benefits.
 - `!pointshop` — the same eight points packages shown on the website:
     - 2,500,000 points — €10
   - 6,500,000 points — €25
