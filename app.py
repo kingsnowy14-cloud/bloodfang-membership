@@ -26,7 +26,11 @@ DISCORD_NOTIFICATION_USER_ID = os.environ.get("DISCORD_NOTIFICATION_USER_ID", "1
 ENABLE_TEST_PURCHASES = os.environ.get("ENABLE_TEST_PURCHASES", "false").lower() == "true"
 STRIPE_SECRET_KEY = os.environ.get("STRIPE_SECRET_KEY", "")
 STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
-STRIPE_CHECKOUT_CONFIGURED = bool(STRIPE_SECRET_KEY and STRIPE_WEBHOOK_SECRET and PUBLIC_BASE_URL)
+PAYNOW_API_KEY = os.environ.get("PAYNOW_API_KEY", "").strip()
+PAYNOW_STORE_ID = os.environ.get("PAYNOW_STORE_ID", "").strip()
+PAYNOW_WEBHOOK_SECRET = os.environ.get("PAYNOW_WEBHOOK_SECRET", "").strip()
+PAYNOW_CHECKOUT_CONFIGURED = False  # Disabled until verified PayNow fulfillment is implemented
+STRIPE_CHECKOUT_CONFIGURED = False  # Stripe disabled; template compatibility only
 
 TIERS = [
     {"name":"STALKER","emoji":"🦴","price":"5,00","points":"25.000","storage":"3"},
@@ -56,7 +60,7 @@ def index():
         session["visual_editor_csrf"] = secrets.token_urlsafe(32)
     return render_template("index.html", tiers=get_tiers(), points=POINT_PACKAGES, user=user,
                            is_admin=is_admin, editor_csrf=session.get("visual_editor_csrf", ""),
-                           stripe_configured=STRIPE_CHECKOUT_CONFIGURED, **site_content)
+                           paynow_configured=PAYNOW_CHECKOUT_CONFIGURED, **site_content)
 
 
 ADMIN_DISCORD_IDS = {
@@ -636,15 +640,15 @@ def checkout(tier_name):
     if not tier:
         return render_template("message.html", title="Rank not found", message="This membership rank does not exist."), 404
     if request.method == "GET":
-        if not STRIPE_CHECKOUT_CONFIGURED and not ENABLE_TEST_PURCHASES:
+        if not PAYNOW_CHECKOUT_CONFIGURED and not ENABLE_TEST_PURCHASES:
             return render_template("message.html", title="Checkout is not ready yet",
-                                   message="Stripe is not configured. No payment has been taken."), 503
+                                   message="PayNow is not configured. No payment has been taken."), 503
         # Memberships are subscription-only. Ignore legacy one-time query parameters.
         requested_type = "subscription"
         session["checkout_csrf"] = secrets.token_urlsafe(24)
         return render_template("message.html", title="Membership checkout", tier=tier, user=user,
                                test_mode=ENABLE_TEST_PURCHASES, csrf_token=session["checkout_csrf"],
-                               payment_mode=True, purchase_type=requested_type, stripe_enabled=STRIPE_CHECKOUT_CONFIGURED)
+                               payment_mode=True, purchase_type=requested_type, paynow_enabled=PAYNOW_CHECKOUT_CONFIGURED)
     submitted_token = request.form.get("csrf_token", "")
     saved_token = session.pop("checkout_csrf", "")
     if not submitted_token or not saved_token or not secrets.compare_digest(submitted_token, saved_token):
@@ -666,15 +670,15 @@ def checkout(tier_name):
             return render_template("message.html", title="Could not activate test membership", message=str(exc)), 502
         return render_template("message.html", title="Test membership activated",
                                message=f"TEST ONLY: {tier['name']} role assigned. No payment was taken.")
-    if provider != "stripe":
-        return render_template("message.html", title="Invalid payment provider", message="Only Stripe payments are supported."), 400
-    if not STRIPE_CHECKOUT_CONFIGURED:
-        return render_template("message.html", title="Stripe checkout unavailable", message="Configure STRIPE_SECRET_KEY and PUBLIC_BASE_URL in Railway. No payment was taken."), 503
+    if provider != "paynow":
+        return render_template("message.html", title="Invalid payment provider", message="Only PayNow payments are supported."), 400
+    if not PAYNOW_CHECKOUT_CONFIGURED:
+        return render_template("message.html", title="PayNow checkout unavailable", message="Configure PAYNOW_API_KEY, PAYNOW_STORE_ID and PUBLIC_BASE_URL in Railway. No payment was taken."), 503
     try:
-        checkout_url = create_stripe_membership_checkout(user, tier, purchase_type)
+        checkout_url = create_paynow_membership_checkout(user, tier, purchase_type)
     except Exception:
-        app.logger.exception("Could not create Stripe membership checkout")
-        return render_template("message.html", title="Checkout could not be started", message="Stripe could not start checkout. No payment was taken."), 502
+        app.logger.exception("Could not create PayNow membership checkout")
+        return render_template("message.html", title="Checkout could not be started", message="PayNow could not start checkout. No payment was taken."), 502
     return redirect(checkout_url)
 
 
@@ -878,7 +882,7 @@ def donate_page():
                              ORDER BY total_cents DESC, donation_count DESC, display_name COLLATE NOCASE ASC LIMIT 5""").fetchall()
     leaderboard = [{"rank": i + 1, "name": ("Anonymous donor" if row["display_name"] == "__anonymous__" else row["display_name"]),
                     "total": f"{row['total_cents'] / 100:.2f}"} for i, row in enumerate(rows)]
-    return render_template("donate.html", user=session.get("discord_user"), csrf_token=session.get("donate_csrf"), stripe_configured=STRIPE_CHECKOUT_CONFIGURED, leaderboard=leaderboard)
+    return render_template("donate.html", user=session.get("discord_user"), csrf_token=session.get("donate_csrf"), paynow_configured=PAYNOW_CHECKOUT_CONFIGURED, leaderboard=leaderboard)
 
 @app.post("/donate/checkout")
 def donate_checkout():
@@ -894,15 +898,15 @@ def donate_checkout():
         amount = 0
     if amount < 9 or amount > 1000:
         return render_template("message.html", title="Invalid amount", message="Choose between EUR 9 and EUR 1,000."), 400
-    if not STRIPE_CHECKOUT_CONFIGURED:
-        return render_template("message.html", title="Donation checkout not configured", message="Configure STRIPE_SECRET_KEY and PUBLIC_BASE_URL in Railway. No payment was taken."), 503
+    if not PAYNOW_CHECKOUT_CONFIGURED:
+        return render_template("message.html", title="Donation checkout not configured", message="Configure PAYNOW_API_KEY, PAYNOW_STORE_ID and PUBLIC_BASE_URL in Railway. No payment was taken."), 503
     anonymous = request.form.get("anonymous") == "yes"
     display_name = "__anonymous__" if anonymous else (user.get("global_name") or user.get("username") or "Donator")
     try:
-        checkout_url = create_stripe_donation_checkout(user["id"], amount, display_name, anonymous)
+        checkout_url = create_paynow_donation_checkout(user["id"], amount, display_name, anonymous)
     except Exception:
-        app.logger.exception("Could not create Stripe donation checkout")
-        return render_template("message.html", title="Donation checkout failed", message="Stripe could not start the donation."), 502
+        app.logger.exception("Could not create PayNow donation checkout")
+        return render_template("message.html", title="Donation checkout failed", message="PayNow could not start the donation."), 502
     return redirect(checkout_url)
 
 
@@ -1132,6 +1136,63 @@ def record_confirmed_donation(capture_id, user_id, display_name, amount_cents, a
 
 
 
+
+# PayNow checkout. Product IDs must match products already created in PayNow.
+# The Discord OAuth ID is NOT a PayNow customer ID. Associate a verified PayNow
+# customer ID with the Discord user on the server before checkout.
+def _paynow_checkout(user_id, product_id, subscription, metadata, cancel_path):
+    if not PAYNOW_CHECKOUT_CONFIGURED:
+        raise RuntimeError("PayNow credentials are not configured")
+    if not product_id or not product_id.isdigit():
+        raise RuntimeError("PayNow product ID is not configured")
+    with db_connect() as db:
+        db.execute("CREATE TABLE IF NOT EXISTS paynow_customer_links (discord_id TEXT PRIMARY KEY, paynow_customer_id TEXT NOT NULL)")
+        row = db.execute("SELECT paynow_customer_id FROM paynow_customer_links WHERE discord_id=?", (str(user_id),)).fetchone()
+    if not row or not str(row["paynow_customer_id"]).isdigit():
+        raise RuntimeError("Discord user has not linked a PayNow customer account")
+    payload = {"customer_id": row["paynow_customer_id"], "lines": [{"product_id": product_id, "quantity": 1, "subscription": subscription}],
+               "metadata": metadata, "return_url": PUBLIC_BASE_URL + "/payment/success",
+               "cancel_url": PUBLIC_BASE_URL + cancel_path}
+    req = urllib.request.Request("https://api.paynow.gg/v1/stores/" + PAYNOW_STORE_ID + "/checkouts",
+        data=json.dumps(payload).encode(), headers={"Authorization": "APIKey " + PAYNOW_API_KEY, "Content-Type": "application/json"}, method="POST")
+    with urllib.request.urlopen(req, timeout=20) as response:
+        result = json.load(response)
+    checkout_url = result.get("url", "")
+    from urllib.parse import urlparse
+    if urlparse(checkout_url).scheme != "https" or not checkout_url:
+        raise RuntimeError("PayNow did not return a valid checkout URL")
+    return checkout_url
+
+def create_paynow_membership_checkout(user, tier, purchase_type):
+    slug = tier["name"].upper().replace(" ", "_")
+    product_id = os.environ.get("PAYNOW_PRODUCT_" + slug, "").strip()
+    return _paynow_checkout(user["id"], product_id, True,
+        {"kind": "membership", "discord_id": str(user["id"]), "tier": tier["name"]},
+        "/checkout/" + tier["name"].lower().replace(" ", "-"))
+
+def create_paynow_donation_checkout(user_id, amount, display_name, anonymous):
+    # Dynamic donation prices require PayNow-approved inline products or a
+    # configured catalog of fixed-price products. Never silently charge a fixed
+    # product price for a user-entered amount.
+    raise RuntimeError("PayNow variable-price donations need an approved pricing method")
+
+@app.post("/webhooks/paynow")
+def paynow_webhook():
+    if not PAYNOW_WEBHOOK_SECRET:
+        return jsonify({"error": "webhook not configured"}), 503
+    raw = request.get_data()
+    timestamp = request.headers.get("PayNow-Timestamp", "")
+    signature = request.headers.get("PayNow-Signature", "")
+    if not timestamp.isdigit() or abs(int(time.time() * 1000) - int(timestamp)) > 300000:
+        return jsonify({"error": "invalid timestamp"}), 401
+    digest = hmac.new(PAYNOW_WEBHOOK_SECRET.encode(), timestamp.encode() + b"." + raw, hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(digest, signature):
+        return jsonify({"error": "invalid signature"}), 401
+    # Never grant roles, points or donation ranks until a PayNow order has been
+    # verified against the store, expected product, customer and payment status.
+    app.logger.warning("PayNow webhook received; fulfillment not yet enabled")
+    return jsonify({"error": "fulfillment not configured"}), 503
+
 def _stripe():
     import stripe
     stripe.api_key = STRIPE_SECRET_KEY
@@ -1166,7 +1227,7 @@ def create_stripe_donation_checkout(user_id, amount, display_name, anonymous):
                   "display_name": display_name, "anonymous": "true" if anonymous else "false"},
     ).url
 
-@app.post("/webhooks/stripe")
+@app.post("/webhooks/stripe-disabled")
 def stripe_webhook():
     stripe = _stripe()
     payload = request.get_data()
@@ -1570,7 +1631,7 @@ def withdrawal():
 def health():
     return {
         "status": "ok",
-        "stripe_configured": STRIPE_CHECKOUT_CONFIGURED,
+        "paynow_configured": PAYNOW_CHECKOUT_CONFIGURED,
         "discord_roles_configured": bool(DISCORD_BOT_TOKEN and DISCORD_GUILD_ID),
         "database_path": DB_PATH,
     }
