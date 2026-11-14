@@ -401,7 +401,6 @@ async def membership(ctx):
         fields.append((
             f"🩸 {name} — {price}",
             f"**Monthly subscription:** {price}/month\n"
-            f"**One-time purchase:** {price} (30 days, no renewal)\n"
             f"**Listed benefits:** {points}; {storage}.",
         ))
     await send_offer_dm(
