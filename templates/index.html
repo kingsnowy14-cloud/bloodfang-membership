@@ -47,7 +47,7 @@
   <section class="section" id="memberships">
     <div class="section-head">
       <div><div class="eyebrow">THE MEMBERSHIP STORE</div><h2>Choose your rank</h2></div>
-      <p>Membership offers and prices. Select monthly billing or a one-time 30-day purchase.</p>
+      <p>Choose your rank. All memberships are monthly subscriptions that renew each month.</p>
     </div>
     <div class="tiers">
       {% for tier in tiers %}
@@ -55,11 +55,7 @@
         <div class="tier-top"><span class="emoji">{{ tier.emoji }}</span><span class="tier-index">{{ "%02d"|format(loop.index) }}</span></div>
         <h3>{{ tier.name }}</h3>
         <div class="price"><span data-tier-price="{{ tier.name }}">€{{ tier.price }}</span><small> / month</small></div>
-        <label class="purchase-choice-label" for="purchase-{{ loop.index }}">Payment option</label>
-        <select class="purchase-choice" id="purchase-{{ loop.index }}" data-base="/checkout/{{ tier.name|lower|replace(' ', '-') }}" aria-label="Payment option for {{ tier.name }}">
-          <option value="subscription" selected>Monthly — €{{ tier.price }} / month</option>
-          <option value="one_time">One-time — 30 days</option>
-        </select>
+        <div class="billing-label">Monthly subscription · €{{ tier.price }} / month</div>
         <div class="benefits">
           <div><span>Bloodpoints / day</span><strong>{{ tier.points }}</strong></div>
           <div><span>Storage slots</span><strong>{{ tier.storage }}</strong></div>
@@ -77,7 +73,7 @@
       </article>
       {% endfor %}
     </div>
-    <p class="disclaimer"><strong>Billing:</strong> Monthly subscriptions renew each month. One-time purchases grant access for 30 days and do not renew. In-game benefits are subject to the server integration being configured and working.</p>
+    <p class="disclaimer"><strong>Billing:</strong> All memberships are monthly subscriptions and renew each month until cancelled. In-game benefits are subject to the server integration being configured and working.</p>
     {% if not stripe_configured %}<p class="disclaimer"><strong>Checkout:</strong> Membership payments are currently disabled until the payment provider and webhook are configured. No payment can be taken yet.</p>{% endif %}
   </section>
 
@@ -95,23 +91,6 @@
   <span>Digital store · The Isle: Evrima · Contact: <a href="mailto:bloodfang.support@gmail.com">bloodfang.support@gmail.com</a></span>
   <nav class="legal-links"><a href="/imprint">Legal Notice</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="/withdrawal">Withdrawal & Cancellation</a></nav>
 </footer>
-<script>
-(() => {
-  document.querySelectorAll('.tier').forEach((card) => {
-    const select = card.querySelector('.purchase-choice');
-    const button = card.querySelector('.tier-checkout');
-    if (!select || !button) return;
-    const updateCheckoutLink = () => {
-      const target = select.dataset.base + '?purchase_type=' + encodeURIComponent(select.value);
-      button.href = button.dataset.loginRequired === 'yes'
-        ? '/login?next=' + encodeURIComponent(target)
-        : target;
-    };
-    select.addEventListener('change', updateCheckoutLink);
-    updateCheckoutLink();
-  });
-})();
-</script>
 
 <script src="{{ url_for('static', filename='visual-edits.js', v='20261113-shared-every-page1') }}" defer></script>
 {% if visual_editor_admin %}<script src="{{ url_for('static', filename='visual-editor.js', v='20261113-shared-every-page1') }}" defer></script>{% endif %}
