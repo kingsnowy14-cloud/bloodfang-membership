@@ -1,97 +1,37 @@
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#0c0b0d">
-  <meta name="description" content="BLOODFANG Store — memberships, Bloodpoints and donations for The Isle: Evrima.">
-  <title>BLOODFANG STORE | The Isle: Evrima</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='style.css', v='20261113-editor-position2') }}">
-{% if visual_editor_admin %}<link rel="stylesheet" href="{{ url_for('static', filename='visual-editor.css', v='shared-editor-20261113') }}">{% endif %}
-{% if visual_editor_admin %}<meta name="visual-editor-csrf" content="{{ visual_editor_csrf }}">{% endif %}
-</head>
-<body class="store-page">
-<header class="topbar">
-  <a class="brand" href="/">BLOOD<span>FANG</span><small>STORE</small></a>
-  {% if visual_editor_admin %}<button class="navbtn visual-edit-launch" id="visualEditLaunch" type="button">✎ Edit website</button><a class="navbtn" href="/admin/website-statistics">📊 Website stats</a>{% endif %}{% if visual_editor_admin %}<a class="navbtn code-view-link" href="/admin/code">⌘ View code</a>{% endif %}
-  <nav class="main-nav" aria-label="Store navigation">
-    <a class="navbtn" href="#memberships">Memberships</a>
-    <a class="navbtn" href="/points-shop">Bloodpoints</a>
-    <a class="navbtn" href="/donate">Donations</a>
-    {% if user %}
-      <a class="navbtn" href="/my-memberships">My purchases</a>
-      <span class="user">{{ user.global_name }}</span>
-      <a class="navbtn" href="/logout">Sign out</a>
-    {% else %}
-      <a class="navbtn" href="/login">Sign in</a>
-    {% endif %}
-  </nav>
-</header>
-<main>
-  <section class="hero store-hero">
-    <div class="eyebrow">THE ISLE: EVRIMA · BLOODFANG STORE</div>
-    <h1><span>{{ hero_title.splitlines()[0] }}</span><br><span>{{ hero_title.splitlines()[1] if hero_title.splitlines()|length > 1 else '' }}</span></h1>
-    <p>{{ hero_description }}</p>
-    <div class="store-actions">
-      <a class="primary" href="#memberships">Shop memberships <span>↓</span></a>
-      <a class="store-secondary" href="/points-shop">Browse Bloodpoints <span>↗</span></a>
-    </div>
-    <div class="hero-mark">BF</div>
-  </section>
+{% if visual_editor_admin %}{% endif %} {% if visual_editor_admin %}{% endif %}
+BLOODFANGSTORE {% if visual_editor_admin %}✎ Edit website📊 Website stats{% endif %}{% if visual_editor_admin %}⌘ View code{% endif %}
+Memberships Bloodpoints Donations {% if user %} My purchases {{ user.global_name }} Sign out {% else %} Sign in {% endif %}
+THE ISLE: EVRIMA · BLOODFANG STORE
+{{ hero_title.splitlines()[0] }}
+{{ hero_title.splitlines()[1] if hero_title.splitlines()|length > 1 else '' }}
 
-  <section class="section store-categories" aria-label="Store categories">
-    <a class="store-category" href="#memberships"><span class="category-symbol">Ⅰ</span><span class="eyebrow">RECURRING OR ONE-TIME</span><strong>Memberships</strong><small>Choose your Bloodfang rank.</small></a>
-    <a class="store-category" href="/points-shop"><span class="category-symbol">Ⅱ</span><span class="eyebrow">ONE-TIME PACKAGES</span><strong>Bloodpoints</strong><small>Choose a points package.</small></a>
-    <a class="store-category" href="/donate"><span class="category-symbol">Ⅲ</span><span class="eyebrow">COMMUNITY SUPPORT</span><strong>Donations</strong><small>Support Bloodfang with an amount of your choice.</small></a>
-  </section>
+{{ hero_description }}
+Shop memberships ↓ Browse Bloodpoints ↗
+BF
+ⅠMONTHLY SUBSCRIPTIONSMembershipsChoose your Bloodfang rank. ⅡONE-TIME PACKAGESBloodpointsChoose a points package. ⅢCOMMUNITY SUPPORTDonationsSupport Bloodfang with an amount of your choice.
+THE MEMBERSHIP STORE
+Choose your rank
 
-  <section class="section" id="memberships">
-    <div class="section-head">
-      <div><div class="eyebrow">THE MEMBERSHIP STORE</div><h2>Choose your rank</h2></div>
-      <p>Choose your rank. All memberships are monthly subscriptions that renew each month.</p>
-    </div>
-    <div class="tiers">
-      {% for tier in tiers %}
-      <article class="tier {% if tier.name in ['APEX','BLOOD EMPEROR','BLOOD TITAN','BLOOD GOD'] %}elite{% endif %}">
-        <div class="tier-top"><span class="emoji">{{ tier.emoji }}</span><span class="tier-index">{{ "%02d"|format(loop.index) }}</span></div>
-        <h3>{{ tier.name }}</h3>
-        <div class="price"><span data-tier-price="{{ tier.name }}">€{{ tier.price }}</span><small> / month</small></div>
-        <div class="billing-label">Monthly subscription · €{{ tier.price }} / month</div>
-        <div class="benefits">
-          <div><span>Bloodpoints / day</span><strong>{{ tier.points }}</strong></div>
-          <div><span>Storage slots</span><strong>{{ tier.storage }}</strong></div>
-          <div><span>Discord role</span><strong>Included</strong></div>
-        </div>
-        {% if stripe_configured %}
-          {% if user %}
-            <a class="tier-button tier-checkout" data-checkout-base="/checkout/{{ tier.name|lower|replace(' ', '-') }}" data-login-required="no" href="/checkout/{{ tier.name|lower|replace(' ', '-') }}">Continue to checkout <span>↗</span></a>
-          {% else %}
-            <a class="tier-button tier-checkout" data-checkout-base="/checkout/{{ tier.name|lower|replace(' ', '-') }}" data-login-required="yes" href="/login">Sign in to purchase <span>↗</span></a>
-          {% endif %}
-        {% else %}
-          <button class="tier-button tier-unavailable" type="button" disabled>Checkout unavailable <span>🔒</span></button>
-        {% endif %}
-      </article>
-      {% endfor %}
-    </div>
-    <p class="disclaimer"><strong>Billing:</strong> All memberships are monthly subscriptions and renew each month until cancelled. In-game benefits are subject to the server integration being configured and working.</p>
-    {% if not stripe_configured %}<p class="disclaimer"><strong>Checkout:</strong> Membership payments are currently disabled until the payment provider and webhook are configured. No payment can be taken yet.</p>{% endif %}
-  </section>
+Choose your rank. All memberships are monthly subscriptions that renew each month.
+{% for tier in tiers %}
+{{ tier.emoji }}{{ "%02d"|format(loop.index) }}
+{{ tier.name }}
+€{{ tier.price }} / month
+Monthly subscription · €{{ tier.price }} / month
+Bloodpoints / day{{ tier.points }}
+Storage slots{{ tier.storage }}
+Discord roleIncluded
+{% if paynow_configured %} {% if user %} Continue to checkout ↗ {% else %} Sign in to purchase ↗ {% endif %} {% else %} Checkout unavailable 🔒 {% endif %}
+{% endfor %}
 
-  <section class="store-bottom">
-    <div class="eyebrow">MORE IN THE STORE</div>
-    <h2>Find what you need.</h2>
-    <div class="store-bottom-links">
-      <a href="/points-shop">Bloodpoints packages <span>↗</span></a>
-      <a href="/donate">Make a donation <span>↗</span></a>
-    </div>
-  </section>
-</main>
-<footer>
-  <a class="brand" href="/">BLOOD<span>FANG</span><small>STORE</small></a>
-  <span>Digital store · The Isle: Evrima · Contact: <a href="mailto:bloodfang.support@gmail.com">bloodfang.support@gmail.com</a></span>
-  <nav class="legal-links"><a href="/imprint">Legal Notice</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="/withdrawal">Withdrawal & Cancellation</a></nav>
-</footer>
+Billing: All memberships are monthly subscriptions and renew each month until cancelled. In-game benefits are subject to the server integration being configured and working.
+{% if not paynow_configured %}
 
-<script src="{{ url_for('static', filename='visual-edits.js', v='20261113-shared-every-page1') }}" defer></script>
-{% if visual_editor_admin %}<script src="{{ url_for('static', filename='visual-editor.js', v='20261113-shared-every-page1') }}" defer></script>{% endif %}
-</body></html>
+Checkout: Membership payments are currently disabled until the payment provider and webhook are configured. No payment can be taken yet.
+{% endif %}
+MORE IN THE STORE
+Find what you need.
+Bloodpoints packages ↗ Make a donation ↗
+BLOODFANGSTORE Digital store · The Isle: Evrima · Contact: bloodfang.support@gmail.com
+Legal NoticePrivacyTermsWithdrawal & Cancellation
+{% if visual_editor_admin %}{% endif %} 
