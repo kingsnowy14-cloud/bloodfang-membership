@@ -639,9 +639,8 @@ def checkout(tier_name):
         if not STRIPE_CHECKOUT_CONFIGURED and not ENABLE_TEST_PURCHASES:
             return render_template("message.html", title="Checkout is not ready yet",
                                    message="Stripe is not configured. No payment has been taken."), 503
-        requested_type = request.args.get("purchase_type", "subscription")
-        if requested_type not in ("subscription", "one_time"):
-            requested_type = "subscription"
+        # Memberships are subscription-only. Ignore legacy one-time query parameters.
+        requested_type = "subscription"
         session["checkout_csrf"] = secrets.token_urlsafe(24)
         return render_template("message.html", title="Membership checkout", tier=tier, user=user,
                                test_mode=ENABLE_TEST_PURCHASES, csrf_token=session["checkout_csrf"],
@@ -650,10 +649,10 @@ def checkout(tier_name):
     saved_token = session.pop("checkout_csrf", "")
     if not submitted_token or not saved_token or not secrets.compare_digest(submitted_token, saved_token):
         return render_template("message.html", title="Checkout expired", message="Please return and try again."), 400
-    purchase_type = request.form.get("purchase_type", "subscription")
+    # Enforce subscription-only memberships on the server, even if an old client
+    # submits purchase_type=one_time manually.
+    purchase_type = "subscription"
     provider = request.form.get("provider", "").lower()
-    if purchase_type not in ("one_time", "subscription"):
-        return render_template("message.html", title="Invalid purchase type", message="Choose a one-time purchase or monthly subscription."), 400
     if ENABLE_TEST_PURCHASES and request.form.get("test_purchase") == "yes":
         if not DISCORD_BOT_TOKEN or not DISCORD_GUILD_ID:
             return render_template("message.html", title="Discord role assignment is not configured", message="Set DISCORD_BOT_TOKEN and DISCORD_GUILD_ID in Railway."), 503
